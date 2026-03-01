@@ -48,6 +48,11 @@ export const EXPLOSION_RADIUS = 35;
 export const MAX_HP = 100;
 export const TURN_TIMEOUT_MS = 30_000;   // 30 seconds per turn
 
+// Center wall — indestructible barrier
+export const WALL_CENTER = CANVAS_WIDTH / 2;  // x=600
+export const WALL_WIDTH = 30;                  // 30px wide
+export const WALL_HEIGHT = 120;                // 120px tall above terrain
+
 // ============================================================================
 // DAMAGE & PAYMENT MODEL
 // ============================================================================

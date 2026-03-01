@@ -14,6 +14,7 @@ import {
   StakeTierDef, getTierByValue, centsToSats, GameEndReason,
   PLATFORM_CUT_PERCENT, GRAVITY, CANVAS_WIDTH, CANVAS_HEIGHT,
   EXPLOSION_RADIUS, MAX_HP, TANK_WIDTH, TANK_HEIGHT, BARREL_LENGTH,
+  WALL_CENTER, WALL_WIDTH, WALL_HEIGHT,
   calculateDamage,
 } from './Constants';
 import { priceService } from '../wallet/BsvService';
@@ -116,8 +117,8 @@ export interface GameOverResult {
 
 function generateTerrain(width: number, height: number, seed: number): number[] {
   const terrain = new Array(width);
-  const baseHeight = height * 0.55;
-  const variance = height * 0.2;
+  const baseHeight = height * 0.50;
+  const variance = height * 0.15;
 
   for (let x = 0; x < width; x++) {
     const nx = x / width;
@@ -182,6 +183,15 @@ function simulateShot(
     y += vy;
 
     trajectory.push({ x, y });
+
+    // Check wall collision (indestructible center wall)
+    const wallLeft = WALL_CENTER - WALL_WIDTH / 2;
+    const wallRight = WALL_CENTER + WALL_WIDTH / 2;
+    const wallTerrainY = getTerrainY(terrain, WALL_CENTER);
+    const wallTop = wallTerrainY - WALL_HEIGHT;
+    if (x >= wallLeft && x <= wallRight && y >= wallTop && y <= wallTerrainY) {
+      return { trajectory, impactX: x, impactY: y };
+    }
 
     // Check terrain collision
     const terrainY = getTerrainY(terrain, x);
@@ -409,6 +419,36 @@ export class TankGameManager {
   }
 
   // ==========================================================================
+  // MOVE TANK — Free movement on your half during your turn
+  // ==========================================================================
+
+  moveTank(socketId: string, newX: number): { success: boolean; x?: number; error?: string } {
+    const game = this.getGameBySocket(socketId);
+    if (!game) return { success: false, error: 'Not in a game' };
+    if (game.phase !== 'playing') return { success: false, error: 'Game not active' };
+
+    const slot = this.getSlot(game, socketId);
+    if (!slot) return { success: false, error: 'Not a player' };
+    if (slot !== game.currentTurn) return { success: false, error: 'Not your turn' };
+
+    // Clamp to valid range
+    const halfW = TANK_WIDTH / 2;
+    const wallLeft = WALL_CENTER - WALL_WIDTH / 2;
+    const wallRight = WALL_CENTER + WALL_WIDTH / 2;
+
+    if (slot === 'player1') {
+      // P1 stays on left side of wall
+      newX = Math.max(halfW + 10, Math.min(wallLeft - halfW - 5, newX));
+    } else {
+      // P2 stays on right side of wall
+      newX = Math.max(wallRight + halfW + 5, Math.min(CANVAS_WIDTH - halfW - 10, newX));
+    }
+
+    game[slot].tankX = Math.round(newX);
+    return { success: true, x: game[slot].tankX };
+  }
+
+  // ==========================================================================
   // GAME END
   // ==========================================================================
 
@@ -593,6 +633,9 @@ export class TankGameManager {
       myWagerPaid: game[forSlot].wagerPaid,
       opponentWagerPaid: game[opp].wagerPaid,
       turnNumber: game.turnNumber,
+      wallCenter: WALL_CENTER,
+      wallWidth: WALL_WIDTH,
+      wallHeight: WALL_HEIGHT,
     };
   }
 

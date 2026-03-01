@@ -304,6 +304,29 @@ export function setupSocketHandlers(io: Server): void {
     });
 
     // ========================================================================
+    // MOVE TANK — Free movement during your turn
+    // ========================================================================
+    socket.on('move_tank', (data: { x: number }) => {
+      if (!rateCheck(socket, 'move_tank')) return;
+
+      const result = gameManager.moveTank(socket.id, data.x);
+      if (!result.success) {
+        socket.emit('move_error', { error: result.error });
+        return;
+      }
+
+      const game = gameManager.getGameBySocket(socket.id);
+      if (!game) return;
+
+      const slot = gameManager.getSlot(game, socket.id)!;
+      const moveData = { slot, x: result.x };
+
+      // Broadcast to both players
+      io.to(game.player1.socketId).emit('tank_moved', moveData);
+      io.to(game.player2.socketId).emit('tank_moved', moveData);
+    });
+
+    // ========================================================================
     // FIRE SHOT — Server-authoritative physics
     // ========================================================================
     socket.on('fire_shot', (data: { angle: number; power: number }) => {
