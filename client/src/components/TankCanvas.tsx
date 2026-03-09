@@ -595,8 +595,17 @@ export default function TankCanvas(props: Props) {
         const pow = P.mySlot === 'player1' ? P.p1Power : P.p2Power;
         const ty = getTY(tx);
         const aR = ang * Math.PI / 180, spd = pow * .14;
-        let sx = tx + Math.cos(aR) * BARREL_LENGTH;
-        let sy = ty - TANK_HEIGHT - TANK_HEIGHT / 2 + Math.sin(-aR) * BARREL_LENGTH;
+
+        // Barrel tip position — match the tank drawing's mount point + barrel length
+        // Mount offset from tank center: ~12px toward facing side, ~30px up
+        // Barrel length: ~40px from mount along the angle direction
+        const mountOffX = 12;
+        const mountOffY = -30;
+        const barrelLen = 40;
+        const tipX = tx + mountOffX * (P.mySlot === 'player2' ? -1 : 1);
+        const tipY = ty + mountOffY;
+        let sx = tipX + Math.cos(aR) * barrelLen;
+        let sy = tipY - Math.sin(aR) * barrelLen;
         let svx = Math.cos(aR) * spd, svy = -Math.sin(aR) * spd;
 
         for (let i = 0; i < 20; i++) {
