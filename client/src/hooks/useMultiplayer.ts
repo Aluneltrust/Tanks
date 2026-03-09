@@ -131,6 +131,7 @@ export function useMultiplayer() {
       setCurrentTurn(data.currentTurn);
       setGamePhase('playing');
       setMessage('Game on! Player 1 fires first.');
+      audioManager.startLoop('engine_idle');
     });
 
     socket.on('shot_result', (data: ShotResultData) => {
@@ -161,6 +162,7 @@ export function useMultiplayer() {
       setDrawOffered(false);
       setMessage(data.message);
       localStorage.removeItem(STORAGE_KEYS.GAME_ID);
+      audioManager.stopLoop();
       audioManager.play(data.payout > 0 ? 'victory' : 'defeat');
     });
 
@@ -192,6 +194,7 @@ export function useMultiplayer() {
         setOpponentWagerPaid(gs.opponentWagerPaid);
         setGamePhase(gs.phase === 'gameover' ? 'gameover' : gs.phase);
         setMessage('Reconnected to your game!');
+        if (gs.phase === 'playing') audioManager.startLoop('engine_idle');
       } else {
         // Game no longer exists — clear stale ID
         localStorage.removeItem(STORAGE_KEYS.GAME_ID);
@@ -331,6 +334,7 @@ export function useMultiplayer() {
   }, [lastShot]);
 
   const resetGame = useCallback(() => {
+    audioManager.stopLoop();
     setGamePhase('lobby');
     setGameId('');
     setPot(0);
