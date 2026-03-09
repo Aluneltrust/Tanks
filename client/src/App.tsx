@@ -241,7 +241,7 @@ export default function App() {
 
         {loginMode === 'unlock' && (
           <div className="intro-form">
-            <p style={{ fontSize: '12px', color: '#888' }}>Wallet: {getAddressHint()?.slice(0, 12)}...</p>
+            <p style={{ fontSize: '12px', color: '#ffffff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>Wallet: {getAddressHint()?.slice(0, 12)}...</p>
             <div className="pin-row">
               <input type="password" placeholder="PIN" maxLength={8} value={pin}
                 onChange={e => { setPin(e.target.value); setLoginError(''); }}
@@ -317,6 +317,12 @@ export default function App() {
         {!mp.myWagerPaid && (
           <button className="btn btn-gold" onClick={payWager} disabled={wagerLoading}>
             {wagerLoading ? 'Paying...' : 'Pay Deposit'}
+          </button>
+        )}
+        {!mp.myWagerPaid && (
+          <button className="btn btn-secondary btn-small"
+            onClick={() => { if (confirm('Cancel match? You will forfeit.')) mp.resign(); }}>
+            Cancel
           </button>
         )}
         <div className="message-bar">{mp.message}</div>

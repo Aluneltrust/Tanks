@@ -238,6 +238,7 @@ export function useMultiplayer() {
       setMyWagerPaid(false);
       setOpponentWagerPaid(false);
       setMessage(data.reason || 'Game cancelled.');
+      localStorage.removeItem(STORAGE_KEYS.GAME_ID);
     });
 
     socket.on('wager_refunded', (data) => {
@@ -305,6 +306,7 @@ export function useMultiplayer() {
   const acceptDraw = useCallback(() => { setDrawOffered(false); socketRef.current?.emit('accept_draw'); }, []);
   const declineDraw = useCallback(() => { setDrawOffered(false); socketRef.current?.emit('decline_draw'); }, []);
   const resign = useCallback(() => { socketRef.current?.emit('resign'); }, []);
+  const leaveWager = useCallback(() => { socketRef.current?.emit('leave_wager'); }, []);
 
   const joinLobby = useCallback((address: string, username: string) => {
     const s = socketRef.current;
@@ -368,7 +370,7 @@ export function useMultiplayer() {
     winner, message, lastShot, animatingShot,
     lobbyPlayers, incomingChallenge, drawOffered,
     connect, findMatch, cancelMatchmaking, submitWager, fireShot, moveTank, submitTerrain,
-    offerDraw, acceptDraw, declineDraw, resign,
+    offerDraw, acceptDraw, declineDraw, resign, leaveWager,
     joinLobby, refreshLobby, challengePlayer, acceptChallenge, declineChallenge,
     finishShotAnimation, resetGame, setMessage, tryReconnect,
   };

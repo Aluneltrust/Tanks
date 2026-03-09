@@ -518,6 +518,21 @@ export class TankGameManager {
     return { success: true, result: this.endGameDraw(game, 'draw_agreement') };
   }
 
+  /** Leave during wager phase (before paying). No win/loss recorded. */
+  leaveWager(socketId: string): { gameId: string; opponentSocketId: string; leaverUsername: string } | null {
+    const game = this.getGameBySocket(socketId);
+    if (!game || game.phase !== 'awaiting_wagers') return null;
+    const slot = this.getSlot(game, socketId);
+    if (!slot) return null;
+    // Only allow if this player hasn't paid yet
+    if (game[slot].wagerPaid) return null;
+    const oppSlot = this.opponentSlot(slot);
+    const opponentSocketId = game[oppSlot].socketId;
+    const leaverUsername = game[slot].username;
+    this.removeGame(game.id);
+    return { gameId: game.id, opponentSocketId, leaverUsername };
+  }
+
   resign(socketId: string): { gameId: string; result: GameOverResult } | null {
     const game = this.getGameBySocket(socketId);
     if (!game || game.phase === 'gameover') return null;

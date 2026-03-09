@@ -50,10 +50,11 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 14px;
+  padding-bottom: 8vh;
   background:
     linear-gradient(to bottom, rgba(6,8,16,0.55) 0%, rgba(6,8,16,0.35) 40%, rgba(6,8,16,0.55) 100%),
-    url('/assets/bg/bg-login.png') center/cover no-repeat,
+    url('/assets/bg/bg-login.png') 50% center/cover no-repeat,
     radial-gradient(ellipse at 30% 20%, rgba(0,229,204,0.06) 0%, transparent 50%),
     radial-gradient(ellipse at 70% 80%, rgba(255,68,102,0.04) 0%, transparent 50%),
     radial-gradient(ellipse at 50% 50%, #0a0e1a 0%, #060810 100%);
@@ -66,25 +67,27 @@ body {
   letter-spacing: 8px;
   text-transform: uppercase;
   color: var(--gold);
-  text-shadow: 0 0 40px var(--gold-glow), 0 4px 20px rgba(0,0,0,0.5);
+  text-shadow: 0 0 40px var(--gold-glow), 0 4px 20px rgba(0,0,0,0.7), 0 0 80px rgba(0,0,0,0.5);
 }
 
 .intro-screen h2 {
   font-family: var(--font-display);
   font-size: 13px;
   font-weight: 400;
-  color: var(--text-dim);
+  color: #ffffff;
   letter-spacing: 6px;
   text-transform: uppercase;
   margin-top: -12px;
+  text-shadow: 0 0 12px rgba(0,0,0,0.8);
 }
 
 .intro-screen p {
-  color: var(--text-muted);
+  color: #ffffff;
   font-size: 14px;
   max-width: 440px;
   text-align: center;
   line-height: 1.8;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.9);
 }
 
 .intro-form {
@@ -175,12 +178,12 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px 24px;
+  padding: 40px 24px 40px 50px;
   gap: 18px;
   overflow-y: auto;
   background:
     linear-gradient(to bottom, rgba(6,8,16,0.5) 0%, rgba(6,8,16,0.3) 50%, rgba(6,8,16,0.5) 100%),
-    url('/assets/bg/bg-lobby.png') center/cover no-repeat,
+    url('/assets/bg/bg-lobby.png') 50% center/cover no-repeat,
     radial-gradient(ellipse at 50% 0%, rgba(0,229,204,0.04) 0%, transparent 60%),
     var(--bg-deep);
 }
@@ -284,7 +287,7 @@ body {
   height: 100vh;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
   background:
-    linear-gradient(to bottom, rgba(6,8,16,0.5) 0%, rgba(6,8,16,0.3) 50%, rgba(6,8,16,0.55) 100%),
+    linear-gradient(to bottom, rgba(6,8,16,0.7) 0%, rgba(6,8,16,0.55) 50%, rgba(6,8,16,0.7) 100%),
     url('/assets/bg/bg-wager.png') center/cover no-repeat,
     radial-gradient(ellipse at 50% 40%, rgba(255,204,0,0.04) 0%, transparent 50%),
     var(--bg-deep);
@@ -293,14 +296,14 @@ body {
   font-family: var(--font-display); font-size: 22px; font-weight: 700;
   color: var(--gold); letter-spacing: 4px; text-shadow: 0 0 20px var(--gold-glow);
 }
-.wager-info { display: flex; flex-direction: column; gap: 6px; align-items: center; font-size: 14px; color: var(--text-dim); }
+.wager-info { display: flex; flex-direction: column; gap: 6px; align-items: center; font-size: 14px; color: #ffffff; text-shadow: 0 1px 6px rgba(0,0,0,0.9); }
 .wager-info .amount {
   font-family: var(--font-display); font-size: 32px; font-weight: 800;
   color: var(--gold); text-shadow: 0 0 24px var(--gold-glow);
 }
 .wager-status { display: flex; gap: 24px; font-size: 14px; font-weight: 600; }
 .wager-status .paid { color: var(--green); }
-.wager-status .waiting { color: var(--text-muted); }
+.wager-status .waiting { color: rgba(220, 225, 240, 0.7); }
 
 /* ============================================
    MATCHMAKING

@@ -402,6 +402,25 @@ export function setupSocketHandlers(io: Server): void {
       io.to(game[opp].socketId).emit('draw_declined');
     });
 
+    socket.on('leave_wager', () => {
+      console.log('[leave_wager] received from', socket.id);
+      if (!rateCheck(socket, 'leave_wager')) return;
+      const result = gameManager.leaveWager(socket.id);
+      console.log('[leave_wager] result:', result);
+      if (!result) return;
+      // Notify the player who left
+      socket.emit('game_cancelled', { reason: 'You left the match.' });
+      // Notify opponent
+      io.to(result.opponentSocketId).emit('game_cancelled', {
+        reason: `${result.leaverUsername} left before paying.`,
+      });
+      // Reset lobby status for both players
+      lobbyManager.setStatus(socket.id, 'idle');
+      lobbyManager.setStatus(result.opponentSocketId, 'idle');
+      spentTracker.releaseGame(result.gameId);
+      broadcastLobby();
+    });
+
     socket.on('resign', async () => {
       if (!rateCheck(socket, 'forfeit')) return;
       const result = gameManager.resign(socket.id);
