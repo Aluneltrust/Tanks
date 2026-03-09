@@ -520,7 +520,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--text-mute
 /* --- Message floating above controls --- */
 .game-message {
   position: absolute;
-  bottom: 84px; left: 50%; transform: translateX(-50%);
+  bottom: calc(84px + 1rem); left: 50%; transform: translateX(-50%);
   font-family: var(--font-body);
   font-size: 14px; font-weight: 600;
   color: var(--gold);
@@ -531,7 +531,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--text-mute
 /* --- Keyboard hints --- */
 .key-hints {
   position: absolute;
-  bottom: 70px; right: 20px;
+  bottom: calc(84px + 1rem + 20px); right: 20px;
   display: flex; gap: 10px;
   z-index: 10; pointer-events: none;
 }

@@ -430,17 +430,20 @@ export class TankGameManager {
     if (!slot) return { success: false, error: 'Not a player' };
     if (slot !== game.currentTurn) return { success: false, error: 'Not your turn' };
 
-    // Clamp to valid range
+    // Clamp to valid range — tanks can only move 30% towards opponent
     const halfW = TANK_WIDTH / 2;
     const wallLeft = WALL_CENTER - WALL_WIDTH / 2;
     const wallRight = WALL_CENTER + WALL_WIDTH / 2;
 
+    const p1Min = halfW + 10;
+    const p1Max = p1Min + (wallLeft - halfW - 5 - p1Min) * 0.3;
+    const p2Max = CANVAS_WIDTH - halfW - 10;
+    const p2Min = p2Max - (p2Max - wallRight - halfW - 5) * 0.3;
+
     if (slot === 'player1') {
-      // P1 stays on left side of wall
-      newX = Math.max(halfW + 10, Math.min(wallLeft - halfW - 5, newX));
+      newX = Math.max(p1Min, Math.min(p1Max, newX));
     } else {
-      // P2 stays on right side of wall
-      newX = Math.max(wallRight + halfW + 5, Math.min(CANVAS_WIDTH - halfW - 10, newX));
+      newX = Math.max(p2Min, Math.min(p2Max, newX));
     }
 
     game[slot].tankX = Math.round(newX);
