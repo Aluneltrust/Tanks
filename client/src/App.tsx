@@ -33,6 +33,7 @@ export default function App() {
   const [myAngle, setMyAngle] = useState(45);
   const [myPower, setMyPower] = useState(50);
   const [wagerLoading, setWagerLoading] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const mp = useMultiplayer();
 
@@ -320,12 +321,31 @@ export default function App() {
           </button>
         )}
         {!mp.myWagerPaid && (
-          <button className="btn btn-secondary btn-small"
-            onClick={() => { if (confirm('Cancel match? You will forfeit.')) mp.resign(); }}>
+          <button className="btn btn-secondary btn-small" onClick={() => setShowCancelConfirm(true)}>
             Cancel
           </button>
         )}
         <div className="message-bar">{mp.message}</div>
+
+        {showCancelConfirm && (
+          <div className="challenge-modal">
+            <div className="challenge-modal-content">
+              <h3>Forfeit Match?</h3>
+              <p style={{ color: '#fff', fontSize: 14, lineHeight: 1.6 }}>
+                Canceling will count as a forfeit.<br />
+                Your opponent wins by default.
+              </p>
+              <div className="actions">
+                <button className="btn btn-primary btn-small" onClick={() => { setShowCancelConfirm(false); mp.resign(); }}>
+                  Forfeit
+                </button>
+                <button className="btn btn-secondary btn-small" onClick={() => setShowCancelConfirm(false)}>
+                  Stay
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -506,7 +526,7 @@ export default function App() {
 
       {mp.message && <div className="message-bar">{mp.message}</div>}
 
-      <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: '#888', letterSpacing: 2 }}>
+      <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 13, color: '#fff', letterSpacing: 2, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
         SELECT TIER
       </h3>
       <div className="tier-selector">

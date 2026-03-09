@@ -199,10 +199,10 @@ body {
 
 .lobby-info {
   display: flex; gap: 20px; align-items: center;
-  color: var(--text-dim); font-size: 13px;
+  color: #ffffff; font-size: 13px; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
 }
 .lobby-info .connected { color: var(--green); font-weight: 600; }
-.lobby-info .address { opacity: 0.5; font-size: 11px; }
+.lobby-info .address { opacity: 0.7; font-size: 11px; }
 
 .tier-selector { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 
@@ -212,7 +212,7 @@ body {
   padding: 9px 18px;
   background: var(--bg-glass);
   border: 1px solid var(--border);
-  color: var(--text-dim);
+  color: #ffffff;
   border-radius: var(--radius);
   cursor: pointer;
   transition: all 0.2s;
@@ -234,7 +234,7 @@ body {
 .players-list h3 {
   font-family: var(--font-display);
   font-size: 11px; font-weight: 600;
-  color: var(--text-muted); letter-spacing: 3px; margin-bottom: 6px;
+  color: rgba(255,255,255,0.7); letter-spacing: 3px; margin-bottom: 6px; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
 }
 
 .player-row {
@@ -245,7 +245,7 @@ body {
 }
 .player-row:hover { border-color: rgba(80,100,160,0.5); }
 .player-row .name { color: var(--text); font-weight: 600; }
-.player-row .stats { color: var(--text-muted); font-size: 12px; }
+.player-row .stats { color: rgba(255,255,255,0.6); font-size: 12px; }
 .player-row .challenge-btn {
   font-family: var(--font-display);
   font-size: 9px; font-weight: 600; letter-spacing: 1px;

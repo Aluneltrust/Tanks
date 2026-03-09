@@ -592,7 +592,11 @@ export function setupSocketHandlers(io: Server): void {
 
       io.to(winnerSocket).emit('game_over', {
         ...base, payout: result.winnerPayout,
-        message: `${loserName}'s tank destroyed! You win! 🏆`,
+        message: result.reason === 'resignation'
+          ? `${loserName} forfeited! You win!`
+          : result.reason === 'disconnect'
+          ? `${loserName} disconnected! You win!`
+          : `${loserName}'s tank destroyed! You win!`,
       });
       io.to(loserSocket).emit('game_over', {
         ...base, payout: 0,

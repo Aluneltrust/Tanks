@@ -495,7 +495,7 @@ export default function TankCanvas(props: Props) {
 
         if (bodyImg && turretImg) {
           // PNG tank — body + rotating barrel
-          const scale = 80 / bodyImg.width; // 80px wide for crisp look
+          const scale = 55 / bodyImg.width; // smaller tanks — further away look
           const bw = bodyImg.width * scale, bh = bodyImg.height * scale;
 
           // Barrel: keep original aspect ratio, scale by same factor
@@ -522,24 +522,24 @@ export default function TankCanvas(props: Props) {
 
         } else {
           // Fallback procedural tank
-          const tankW = 44, tankH = 22;
+          const tankW = 30, tankH = 15;
 
           // Tracks
           ctx.fillStyle = '#1a1a1a';
           ctx.fillRect(-tankW / 2, -4, tankW, 12);
           // Wheels — animate rotation when moving
           ctx.fillStyle = '#444';
-          for (let i = -3; i <= 3; i++) {
+          for (let i = -2; i <= 2; i++) {
             ctx.beginPath();
-            ctx.arc(i * 6, 2, 4, 0, Math.PI * 2);
+            ctx.arc(i * 6, 2, 3, 0, Math.PI * 2);
             ctx.fill();
             // Wheel spoke
             ctx.strokeStyle = '#555';
-            ctx.lineWidth = .8;
+            ctx.lineWidth = .6;
             const wheelAngle = now * (anim.moving ? 12 : 0) + i;
             ctx.beginPath();
-            ctx.moveTo(i * 6 + Math.cos(wheelAngle) * 3, 2 + Math.sin(wheelAngle) * 3);
-            ctx.lineTo(i * 6 - Math.cos(wheelAngle) * 3, 2 - Math.sin(wheelAngle) * 3);
+            ctx.moveTo(i * 6 + Math.cos(wheelAngle) * 2, 2 + Math.sin(wheelAngle) * 2);
+            ctx.lineTo(i * 6 - Math.cos(wheelAngle) * 2, 2 - Math.sin(wheelAngle) * 2);
             ctx.stroke();
           }
 
@@ -558,19 +558,19 @@ export default function TankCanvas(props: Props) {
           // Turret dome
           ctx.fillStyle = c2;
           ctx.beginPath();
-          ctx.arc(0, -tankH + 4, 12, 0, Math.PI * 2);
+          ctx.arc(0, -tankH + 3, 8, 0, Math.PI * 2);
           ctx.fill();
 
           // Barrel (rotates)
           ctx.save();
-          ctx.translate(0, -tankH + 4);
+          ctx.translate(0, -tankH + 3);
           const fallbackEffAngle = facingLeft ? (180 - angle) : angle;
           const barrelAngle = -(fallbackEffAngle * Math.PI / 180);
           ctx.rotate(barrelAngle);
           ctx.fillStyle = '#666';
-          ctx.fillRect(0, -2.5, 35, 5);
+          ctx.fillRect(0, -1.8, 24, 3.5);
           ctx.fillStyle = '#555';
-          ctx.fillRect(32, -3.5, 6, 7);
+          ctx.fillRect(22, -2.5, 4, 5);
           ctx.restore();
         }
 
@@ -591,8 +591,11 @@ export default function TankCanvas(props: Props) {
         anim.moveSmoke *= .95;
       };
 
-      drawTank(P.p1x, P.p1Angle, P.p1Hp, 'player1', A?.tank1Body ?? null, A?.tank1Turret ?? null);
-      drawTank(P.p2x, P.p2Angle, P.p2Hp, 'player2', A?.tank2Body ?? null, A?.tank2Turret ?? null);
+      // Use tank1 assets for both (they're identical) — prevents loading race where one fails
+      const tBody = A?.tank1Body ?? A?.tank2Body ?? null;
+      const tTurret = A?.tank1Turret ?? A?.tank2Turret ?? null;
+      drawTank(P.p1x, P.p1Angle, P.p1Hp, 'player1', tBody, tTurret);
+      drawTank(P.p2x, P.p2Angle, P.p2Hp, 'player2', tBody, tTurret);
 
       // ===== AIM GUIDE =====
       if (!animRef.current && P.currentTurn === P.mySlot) {
@@ -611,9 +614,9 @@ export default function TankCanvas(props: Props) {
         const slope = Math.atan2(sRightY - sLeftY, slopeSpan * 2);
 
         // Barrel mount point in tank-local coords (before flip)
-        // From drawTank PNG path: translate(bw*.15, -bh*.62) with 80px body
-        const mountLocalX = 12; // bw * .15 ≈ 12
-        const mountLocalY = -30; // -bh * .62 ≈ -30
+        // From drawTank PNG path: translate(bw*.15, -bh*.62) with 55px body
+        const mountLocalX = 8; // bw * .15 ≈ 8
+        const mountLocalY = -21; // -bh * .62 ≈ -21
 
         // Apply flip then slope rotation to get mount point in world coords
         const mx = mountLocalX * flipSign;
@@ -622,8 +625,7 @@ export default function TankCanvas(props: Props) {
         const mountWorldY = ty + mx * Math.sin(slope) + my * Math.cos(slope);
 
         // Barrel tip: barrel extends along the fire angle from mount point
-        // The barrel length in the PNG is ~35px
-        const brlLen = 35;
+        const brlLen = 24;
         let sx = mountWorldX + Math.cos(aR) * brlLen;
         let sy = mountWorldY - Math.sin(aR) * brlLen;
         let svx = Math.cos(aR) * spd, svy = -Math.sin(aR) * spd;
@@ -672,31 +674,65 @@ export default function TankCanvas(props: Props) {
       // ===== PROJECTILE =====
       if (proj && proj.idx > 0 && proj.idx < proj.pts.length) {
         const end = Math.min(proj.idx, proj.pts.length);
-        const start = Math.max(0, end - 50);
-        // Trail
-        for (let i = start + 1; i < end; i++) {
-          ctx.strokeStyle = `rgba(255,220,80,${(i - start) / (end - start) * .5})`;
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(proj.pts[i - 1].x, proj.pts[i - 1].y);
-          ctx.lineTo(proj.pts[i].x, proj.pts[i].y);
-          ctx.stroke();
-        }
-        // Head
+        const start = Math.max(0, end - 40);
         const pt = proj.pts[end - 1];
-        // Glow
-        ctx.globalAlpha = .3;
-        const glow = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, 10);
-        glow.addColorStop(0, '#ffee88');
-        glow.addColorStop(1, 'rgba(255,200,0,0)');
+
+        // Smoke trail — fading gray/brown wisps
+        for (let i = start + 1; i < end; i++) {
+          const age = (i - start) / (end - start);
+          const trailAlpha = age * .25;
+          const trailSize = 1.5 + (1 - age) * 3;
+          ctx.globalAlpha = trailAlpha;
+          ctx.fillStyle = `rgba(${140 - age * 60 | 0},${130 - age * 50 | 0},${120 - age * 40 | 0},1)`;
+          ctx.beginPath();
+          ctx.arc(proj.pts[i].x + (Math.random() - .5) * 2, proj.pts[i].y + (Math.random() - .5) * 2, trailSize, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Shell body — dark elongated shape oriented along flight direction
+        if (end >= 2) {
+          const prev = proj.pts[end - 2];
+          const dx = pt.x - prev.x, dy = pt.y - prev.y;
+          const shellAngle = Math.atan2(dy, dx);
+
+          ctx.save();
+          ctx.translate(pt.x, pt.y);
+          ctx.rotate(shellAngle);
+
+          // Shell shape — dark metallic
+          ctx.fillStyle = '#3a3a3a';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 6, 2.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          // Nose highlight
+          ctx.fillStyle = '#666';
+          ctx.beginPath();
+          ctx.ellipse(3, -0.5, 2, 1.2, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
+        }
+
+        // Fire glow behind shell
+        ctx.globalAlpha = .4;
+        const glow = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, 8);
+        glow.addColorStop(0, '#ffcc44');
+        glow.addColorStop(.5, 'rgba(255,120,20,0.4)');
+        glow.addColorStop(1, 'rgba(255,80,0,0)');
         ctx.fillStyle = glow;
-        ctx.beginPath(); ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
-        // Core
-        ctx.fillStyle = '#ffe040';
-        ctx.beginPath(); ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, Math.PI * 2); ctx.fill();
+
+        // Emit trail smoke particles every few frames
+        if (proj.idx % 2 === 0) {
+          particlesRef.current.push({
+            x: pt.x + (Math.random() - .5) * 3,
+            y: pt.y + (Math.random() - .5) * 3,
+            vx: (Math.random() - .5) * .3,
+            vy: -(0.2 + Math.random() * .3),
+            life: 1, decay: .02, size: 2 + Math.random() * 2, kind: 'smoke',
+          });
+        }
       }
 
       // ===== PARTICLES =====
