@@ -597,9 +597,9 @@ export default function TankCanvas(props: Props) {
         const aR = ang * Math.PI / 180, spd = pow * .14;
 
         // Barrel tip position — match the tank drawing's mount point + barrel length
-        const mountOffX = 6;
-        const mountOffY = -22;
-        const barrelLen = 36;
+        const mountOffX = 10;
+        const mountOffY = -18;
+        const barrelLen = 30;
         const tipX = tx + mountOffX * (P.mySlot === 'player2' ? -1 : 1);
         const tipY = ty + mountOffY;
         let sx = tipX + Math.cos(aR) * barrelLen;

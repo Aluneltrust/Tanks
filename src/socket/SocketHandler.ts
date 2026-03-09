@@ -21,7 +21,7 @@ function rateCheck(socket: Socket, event: string): boolean {
 }
 
 const pendingRevocations = new Map<string, NodeJS.Timeout>();
-const REVOCATION_DELAY_MS = 125_000;
+const REVOCATION_DELAY_MS = 35_000;
 
 export function setupSocketHandlers(io: Server): void {
 
@@ -494,8 +494,8 @@ export function setupSocketHandlers(io: Server): void {
           const opp = gameManager.opponentSlot(gameResult.slot);
           io.to(game[opp].socketId).emit('opponent_disconnected', {
             gameOver: false,
-            message: `${game[gameResult.slot].username} disconnected. 2 min to reconnect...`,
-            graceMs: 120_000,
+            message: `${game[gameResult.slot].username} disconnected. 30s to reconnect...`,
+            graceMs: 30_000,
           });
         } else {
           sessionManager.revokeBySocket(socket.id);

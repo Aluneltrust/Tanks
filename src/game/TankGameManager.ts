@@ -219,7 +219,7 @@ export class TankGameManager {
   private disconnectTimers = new Map<string, NodeJS.Timeout>();
 
   private readonly TURN_TIMEOUT_MS = 30_000;
-  private readonly RECONNECT_GRACE_MS = 120_000;
+  private readonly RECONNECT_GRACE_MS = 30_000;
 
   // Callbacks
   onTurnTimeout: ((gameId: string, winner: PlayerSlot, loser: PlayerSlot) => void) | null = null;
@@ -546,15 +546,11 @@ export class TankGameManager {
     const opponent = this.opponentSlot(slot);
     this.clearTurnTimer(game.id);
 
-    if (game.phase === 'awaiting_wagers') {
+    if (game.phase === 'awaiting_wagers' && !game[slot].wagerPaid && !game[opponent].wagerPaid) {
+      // Neither player has paid — safe to cancel immediately
       game.phase = 'gameover';
       game.endedAt = Date.now();
       game.endReason = 'disconnect';
-
-      let wagerRefund: { address: string; amount: number } | undefined;
-      if (game[opponent].wagerPaid) {
-        wagerRefund = { address: game[opponent].address, amount: game.depositSats };
-      }
 
       return {
         gameId: game.id, slot, graceStarted: false,
@@ -563,11 +559,10 @@ export class TankGameManager {
           pot: 0, winnerPayout: 0, loserPayout: 0, platformCut: 0,
           p1Address: game.player1.address, p2Address: game.player2.address,
         },
-        wagerRefund,
       };
     }
 
-    // Playing phase — grace period
+    // Any phase with money involved — grace period for reconnect
     const timerKey = `${game.id}:${slot}`;
     this.clearDisconnectTimer(game.id, slot);
 
