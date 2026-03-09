@@ -377,6 +377,7 @@ export function setupSocketHandlers(io: Server): void {
     // DRAW / RESIGN
     // ========================================================================
     socket.on('offer_draw', () => {
+      if (!rateCheck(socket, 'offer_draw')) return;
       const result = gameManager.offerDraw(socket.id);
       if (!result.success) { socket.emit('error', { message: result.error }); return; }
       io.to(result.opponentSocketId!).emit('draw_offered');
@@ -384,6 +385,7 @@ export function setupSocketHandlers(io: Server): void {
     });
 
     socket.on('accept_draw', async () => {
+      if (!rateCheck(socket, 'accept_draw')) return;
       const result = gameManager.acceptDraw(socket.id);
       if (!result.success) { socket.emit('error', { message: result.error }); return; }
       const game = gameManager.getGameBySocket(socket.id);
@@ -391,6 +393,7 @@ export function setupSocketHandlers(io: Server): void {
     });
 
     socket.on('decline_draw', () => {
+      if (!rateCheck(socket, 'decline_draw')) return;
       const game = gameManager.getGameBySocket(socket.id);
       if (!game) return;
       const slot = gameManager.getSlot(game, socket.id);
@@ -545,12 +548,21 @@ export function setupSocketHandlers(io: Server): void {
         }
       }
     } else {
+      // Draw — refund both players
       if (result.pot > 0 && result.winnerPayout > 546) {
-        const tx = await escrowManager.settle(
+        // Settle P1's refund
+        const tx1 = await escrowManager.settle(
           game.id, result.p1Address, result.winnerPayout,
-          result.platformCut + result.loserPayout,
+          result.platformCut,
         );
-        if (tx.success) settleTxid = tx.txid || '';
+        if (tx1.success) settleTxid = tx1.txid || '';
+        // Settle P2's refund from remaining escrow
+        if (result.loserPayout > 546) {
+          const tx2 = await escrowManager.settle(
+            game.id, result.p2Address, result.loserPayout, 0,
+          );
+          if (tx2.success && !settleTxid) settleTxid = tx2.txid || '';
+        }
       }
     }
 

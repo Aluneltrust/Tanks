@@ -109,7 +109,7 @@ export default function TerrainDrawer({ mySlot, onSubmit }: TerrainDrawerProps) 
 
   const handleSubmit = useCallback(() => {
     setSubmitted(true);
-    onSubmit(heightsRef.current);
+    onSubmit([...heightsRef.current]);
   }, [onSubmit]);
 
   const handleReset = useCallback(() => {

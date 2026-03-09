@@ -39,6 +39,7 @@ export default function TankCanvas(props: Props) {
   const particlesRef = useRef<Pt[]>([]);
   const assetsRef = useRef<GameAssets | null>(null);
   const starsRef = useRef<{ x: number; y: number; s: number; t: number }[]>([]);
+  const treeSpikeRef = useRef<number[]>([]);
   const terrainCacheRef = useRef<HTMLCanvasElement | null>(null);
 
   // Tank animation states
@@ -101,6 +102,12 @@ export default function TankCanvas(props: Props) {
           s: .3 + Math.random() * 1.2,
           t: Math.random() * Math.PI * 2,
         });
+      }
+    }
+
+    if (!treeSpikeRef.current.length) {
+      for (let i = 0; i <= 60; i++) {
+        treeSpikeRef.current.push((i % 3 === 0) ? -8 - Math.random() * 6 : -2);
       }
     }
 
@@ -176,7 +183,7 @@ export default function TankCanvas(props: Props) {
         const x = (i / 60) * W;
         const base = H * .49;
         // Spiky tree shapes
-        const spike = (i % 3 === 0) ? -8 - Math.random() * 6 : -2;
+        const spike = treeSpikeRef.current[i] ?? -2;
         ctx.lineTo(x, base + spike - Math.sin(i * .4) * 5);
       }
       ctx.lineTo(W, H * .52); ctx.fill();

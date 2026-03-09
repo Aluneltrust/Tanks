@@ -17,7 +17,7 @@ import {
   WALL_CENTER, WALL_WIDTH, WALL_HEIGHT,
   calculateDamage,
 } from './Constants';
-import { priceService } from '../wallet/BsvService';
+import { priceService, escrowManager } from '../wallet/BsvService';
 
 // ============================================================================
 // TYPES
@@ -127,11 +127,11 @@ function generateTerrain(width: number, height: number, seed: number): number[] 
       + Math.sin(nx * 7 + seed * 2) * variance * 0.2
       + Math.sin(nx * 13 + seed * 0.5) * variance * 0.1
       + Math.sin(nx * 25 + seed * 3) * variance * 0.05;
-
-    // Flatten edges for tanks
-    if (x < 80) terrain[x] = terrain[80] || baseHeight;
-    if (x > width - 80) terrain[x] = terrain[width - 80] || baseHeight;
   }
+
+  // Flatten edges for tanks (second pass, after all values computed)
+  for (let x = 0; x < 80; x++) terrain[x] = terrain[80];
+  for (let x = width - 79; x < width; x++) terrain[x] = terrain[width - 80];
 
   return terrain;
 }
@@ -288,6 +288,7 @@ export class TankGameManager {
   } {
     const game = this.games.get(gameId);
     if (!game) return { success: false, bothPaid: false };
+    if (game[slot].wagerPaid) return { success: false, bothPaid: false };
 
     game[slot].wagerPaid = true;
     game.pot += game.depositSats;
@@ -367,8 +368,6 @@ export class TankGameManager {
       const amountSats = Math.ceil(game.baseSats * (damagePercent / 100));
       const platformSats = Math.ceil(amountSats * PLATFORM_CUT_PERCENT / 100);
       const shooterSats = amountSats - platformSats;
-
-      game.pot += amountSats;
 
       hitPayment = {
         victimSlot: opponentSlot,
@@ -576,7 +575,6 @@ export class TankGameManager {
       const g = this.games.get(game.id);
       if (!g || g.phase === 'gameover') return;
       if (!g[slot].connected) {
-        this.endGame(g, opponent, 'disconnect');
         this.onDisconnectTimeout?.(game.id, opponent, slot);
       }
     }, this.RECONNECT_GRACE_MS);
@@ -604,8 +602,16 @@ export class TankGameManager {
     this.playerToGame.set(socketId, gameId);
 
     if (game.phase === 'playing') {
-      game.turnStartedAt = Date.now();
-      this.startTurnTimer(game);
+      const elapsed = Date.now() - game.turnStartedAt;
+      const remaining = Math.max(1000, this.TURN_TIMEOUT_MS - elapsed);
+      this.clearTurnTimer(game.id);
+      const timer = setTimeout(() => {
+        if (game.phase !== 'playing') return;
+        const loser = game.currentTurn;
+        const winner = this.opponentSlot(loser);
+        this.onTurnTimeout?.(game.id, winner, loser);
+      }, remaining);
+      this.turnTimers.set(game.id, timer);
     }
 
     return { success: true, game, slot };
@@ -633,6 +639,7 @@ export class TankGameManager {
       myWagerPaid: game[forSlot].wagerPaid,
       opponentWagerPaid: game[opp].wagerPaid,
       turnNumber: game.turnNumber,
+      escrowAddress: escrowManager.getGameAddress(game.id),
       wallCenter: WALL_CENTER,
       wallWidth: WALL_WIDTH,
       wallHeight: WALL_HEIGHT,
@@ -647,9 +654,9 @@ export class TankGameManager {
     this.clearTurnTimer(game.id);
     const timer = setTimeout(() => {
       if (game.phase !== 'playing') return;
-      const winner = this.opponentSlot(game.currentTurn);
-      this.endGame(game, winner, 'timeout');
-      this.onTurnTimeout?.(game.id, winner, game.currentTurn);
+      const loser = game.currentTurn;
+      const winner = this.opponentSlot(loser);
+      this.onTurnTimeout?.(game.id, winner, loser);
     }, this.TURN_TIMEOUT_MS);
     this.turnTimers.set(game.id, timer);
   }

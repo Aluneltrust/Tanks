@@ -22,6 +22,7 @@ export class MatchmakingQueue {
     if (queue.length > 0) {
       const opponent = queue.shift()!;
       if (opponent.socketId === entry.socketId || opponent.address === entry.address) {
+        queue.unshift(opponent);
         queue.push(entry);
         return { matched: false };
       }

@@ -12,6 +12,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   find_match:           { maxRequests: 2,  windowMs: 10_000 },
   cancel_matchmaking:   { maxRequests: 3,  windowMs: 10_000 },
   fire_shot:            { maxRequests: 3,  windowMs: 3_000  }, // reused for make_move
+  move_tank:            { maxRequests: 10, windowMs: 1_000 },
   submit_payment:       { maxRequests: 3,  windowMs: 5_000  },
   funds_added:          { maxRequests: 2,  windowMs: 10_000 },
   forfeit:              { maxRequests: 2,  windowMs: 10_000 },
@@ -25,6 +26,9 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   accept_challenge:     { maxRequests: 3,  windowMs: 10_000 },
   decline_challenge:    { maxRequests: 5,  windowMs: 10_000 },
   cancel_challenge:     { maxRequests: 3,  windowMs: 10_000 },
+  offer_draw:           { maxRequests: 2,  windowMs: 10_000 },
+  accept_draw:          { maxRequests: 2,  windowMs: 10_000 },
+  decline_draw:         { maxRequests: 3,  windowMs: 10_000 },
 };
 
 export class SocketRateLimiter {

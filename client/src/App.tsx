@@ -81,7 +81,7 @@ export default function App() {
     setLoginLoading(true);
     try {
       const pk = PrivateKey.fromRandom();
-      const addr = pk.toPublicKey().toAddress(BSV_NETWORK === 'main' ? 'mainnet' : 'testnet');
+      const addr = pk.toPublicKey().toAddress(BSV_NETWORK === 'main' ? 'mainnet' : 'testnet').toString();
       await encryptAndStoreWif(pk.toWif(), pin, addr);
       localStorage.setItem(STORAGE_KEYS.USERNAME, username.trim());
       setWalletKey(pk);
@@ -99,7 +99,7 @@ export default function App() {
     try {
       const wif = await decryptStoredWif(pin);
       const pk = PrivateKey.fromWif(wif);
-      const addr = pk.toPublicKey().toAddress(BSV_NETWORK === 'main' ? 'mainnet' : 'testnet');
+      const addr = pk.toPublicKey().toAddress(BSV_NETWORK === 'main' ? 'mainnet' : 'testnet').toString();
       const savedName = localStorage.getItem(STORAGE_KEYS.USERNAME) || 'Player';
       setUsername(savedName);
       setWalletKey(pk);
@@ -119,7 +119,7 @@ export default function App() {
       const wifInput = prompt('Paste your WIF private key:');
       if (!wifInput) { setLoginLoading(false); return; }
       const pk = PrivateKey.fromWif(wifInput.trim());
-      const addr = pk.toPublicKey().toAddress(BSV_NETWORK === 'main' ? 'mainnet' : 'testnet');
+      const addr = pk.toPublicKey().toAddress(BSV_NETWORK === 'main' ? 'mainnet' : 'testnet').toString();
       await encryptAndStoreWif(pk.toWif(), pin, addr);
       localStorage.setItem(STORAGE_KEYS.USERNAME, username.trim());
       setWalletKey(pk);
@@ -419,8 +419,17 @@ export default function App() {
             <div className="control-divider" />
 
             <div className="game-actions">
-              <button onClick={mp.offerDraw}>Draw</button>
-              <button onClick={() => { if (confirm('Surrender?')) mp.resign(); }}>Resign</button>
+              {mp.drawOffered ? (
+                <>
+                  <button onClick={mp.acceptDraw}>Accept Draw</button>
+                  <button onClick={mp.declineDraw}>Decline</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={mp.offerDraw}>Draw</button>
+                  <button onClick={() => { if (confirm('Surrender?')) mp.resign(); }}>Resign</button>
+                </>
+              )}
             </div>
           </div>
         </div>

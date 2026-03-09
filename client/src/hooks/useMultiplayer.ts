@@ -54,6 +54,7 @@ export function useMultiplayer() {
   const [message, setMessage] = useState('');
   const [lastShot, setLastShot] = useState<ShotResultData | null>(null);
   const [animatingShot, setAnimatingShot] = useState(false);
+  const [drawOffered, setDrawOffered] = useState(false);
 
   // Lobby
   const [lobbyPlayers, setLobbyPlayers] = useState<any[]>([]);
@@ -62,7 +63,7 @@ export function useMultiplayer() {
   const socketRef = useRef<Socket | null>(null);
 
   const connect = useCallback(() => {
-    if (socketRef.current?.connected) return;
+    if (socketRef.current) return;
     const socket = io(BACKEND_URL, { transports: ['websocket', 'polling'] });
 
     socket.on('connect', () => setIsConnected(true));
@@ -121,8 +122,8 @@ export function useMultiplayer() {
 
     socket.on('game_start', (data) => {
       if (data.terrain) setTerrain(data.terrain);
-      if (data.p1x) setP1x(data.p1x);
-      if (data.p2x) setP2x(data.p2x);
+      if (data.p1x !== undefined) setP1x(data.p1x);
+      if (data.p2x !== undefined) setP2x(data.p2x);
       if (data.wind !== undefined) setWind(data.wind);
       setPot(data.pot);
       setCurrentTurn(data.currentTurn);
@@ -143,6 +144,7 @@ export function useMultiplayer() {
     });
 
     socket.on('draw_offered', () => {
+      setDrawOffered(true);
       setMessage('Opponent offers a draw. Accept?');
     });
 
@@ -155,6 +157,7 @@ export function useMultiplayer() {
       setGamePhase('gameover');
       setPot(data.pot);
       setWinner(data.winner === null ? 'draw' : data.winner);
+      setDrawOffered(false);
       setMessage(data.message);
       localStorage.removeItem(STORAGE_KEYS.GAME_ID);
     });
@@ -182,6 +185,7 @@ export function useMultiplayer() {
         setPot(gs.pot);
         setDepositSats(gs.depositSats);
         setBaseSats(gs.baseSats);
+        if (gs.escrowAddress) setEscrowAddress(gs.escrowAddress);
         setMyWagerPaid(gs.myWagerPaid);
         setOpponentWagerPaid(gs.opponentWagerPaid);
         setGamePhase(gs.phase === 'gameover' ? 'gameover' : gs.phase);
@@ -272,8 +276,8 @@ export function useMultiplayer() {
   }, []);
 
   const offerDraw = useCallback(() => { socketRef.current?.emit('offer_draw'); }, []);
-  const acceptDraw = useCallback(() => { socketRef.current?.emit('accept_draw'); }, []);
-  const declineDraw = useCallback(() => { socketRef.current?.emit('decline_draw'); }, []);
+  const acceptDraw = useCallback(() => { setDrawOffered(false); socketRef.current?.emit('accept_draw'); }, []);
+  const declineDraw = useCallback(() => { setDrawOffered(false); socketRef.current?.emit('decline_draw'); }, []);
   const resign = useCallback(() => { socketRef.current?.emit('resign'); }, []);
 
   const joinLobby = useCallback((address: string, username: string) => {
@@ -325,6 +329,7 @@ export function useMultiplayer() {
     setP2Hp(100);
     setLastShot(null);
     setAnimatingShot(false);
+    setDrawOffered(false);
   }, []);
 
   return {
@@ -332,7 +337,7 @@ export function useMultiplayer() {
     escrowAddress, depositSats, baseSats, pot, myWagerPaid, opponentWagerPaid,
     terrain, wind, currentTurn, p1Hp, p2Hp, p1x, p2x,
     winner, message, lastShot, animatingShot,
-    lobbyPlayers, incomingChallenge,
+    lobbyPlayers, incomingChallenge, drawOffered,
     connect, findMatch, cancelMatchmaking, submitWager, fireShot, moveTank, submitTerrain,
     offerDraw, acceptDraw, declineDraw, resign,
     joinLobby, refreshLobby, challengePlayer, acceptChallenge, declineChallenge,
