@@ -461,6 +461,10 @@ export function setupSocketHandlers(io: Server): void {
           const opp = gameManager.opponentSlot(gameResult.slot);
 
           if (game) {
+            // Reset remaining player's lobby status to idle
+            lobbyManager.setStatus(game[opp].socketId, 'idle');
+            broadcastLobby();
+
             io.to(game[opp].socketId).emit('game_cancelled', {
               reason: 'Opponent left before paying deposit.',
               refund: gameResult.wagerRefund ? gameResult.wagerRefund.amount : 0,
