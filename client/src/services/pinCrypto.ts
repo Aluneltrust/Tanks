@@ -39,9 +39,19 @@ function fromBase64(b64: string): Uint8Array {
 // Public API
 // ---------------------------------------------------------------------------
 
-/** Check whether an encrypted wallet exists in localStorage. */
+/** Check whether a valid encrypted wallet exists in localStorage. */
 export function hasStoredWallet(): boolean {
-  return !!localStorage.getItem(STORAGE_KEYS.WALLET_ENC);
+  const raw = localStorage.getItem(STORAGE_KEYS.WALLET_ENC);
+  if (!raw) return false;
+  try {
+    const parsed = JSON.parse(raw);
+    return !!(parsed.salt && parsed.iv && parsed.ct);
+  } catch {
+    // Corrupted data — clear it
+    localStorage.removeItem(STORAGE_KEYS.WALLET_ENC);
+    localStorage.removeItem(STORAGE_KEYS.WALLET_ADDR);
+    return false;
+  }
 }
 
 /** Return the stored address hint (truncated address) or null. */
@@ -81,7 +91,13 @@ export async function decryptStoredWif(pin: string): Promise<string> {
   const raw = localStorage.getItem(STORAGE_KEYS.WALLET_ENC);
   if (!raw) throw new Error('No stored wallet');
 
-  const { salt, iv, ct } = JSON.parse(raw);
+  let parsed: { salt: string; iv: string; ct: string };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('Wallet data is corrupted. Please delete and recreate your wallet.');
+  }
+  const { salt, iv, ct } = parsed;
   const key = await deriveKey(pin, fromBase64(salt));
 
   try {
