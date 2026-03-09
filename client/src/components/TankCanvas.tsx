@@ -465,7 +465,7 @@ export default function TankCanvas(props: Props) {
         // Muzzle flash
         if (anim.muzzleFlash > 0) {
           const aR = angle * Math.PI / 180;
-          const flashX = px + Math.cos(aR) * 40 * (facingLeft ? -1 : 1);
+          const flashX = px + Math.cos(aR) * 40;
           const flashY = ty - 18 - Math.sin(aR) * 40;
           ctx.save();
           ctx.globalAlpha = anim.muzzleFlash;
@@ -504,10 +504,10 @@ export default function TankCanvas(props: Props) {
           // This is roughly at x = bw * 0.15 from center, y = top of turret area
           ctx.save();
           ctx.translate(bw * .15, -bh * .62); // barrel mount point at turret edge
-          // Angle: 0° = horizontal right, positive = up
-          // Game angle: 0=right, 90=up, 180=left
-          // Only allow elevation between ~10° and ~80° from horizontal
-          const elevationRad = -(angle * Math.PI / 180);
+          // In the flipped coordinate system (player 2), we need to mirror the angle
+          // so the barrel direction matches the trajectory direction
+          const effectiveAngle = facingLeft ? (180 - angle) : angle;
+          const elevationRad = -(effectiveAngle * Math.PI / 180);
           ctx.rotate(elevationRad);
           // Draw barrel starting from pivot, extending right
           // The left edge of the barrel image = the pivot point
@@ -558,7 +558,8 @@ export default function TankCanvas(props: Props) {
           // Barrel (rotates)
           ctx.save();
           ctx.translate(0, -tankH + 4);
-          const barrelAngle = -(angle * Math.PI / 180);
+          const fallbackEffAngle = facingLeft ? (180 - angle) : angle;
+          const barrelAngle = -(fallbackEffAngle * Math.PI / 180);
           ctx.rotate(barrelAngle);
           ctx.fillStyle = '#666';
           ctx.fillRect(0, -2.5, 35, 5);
