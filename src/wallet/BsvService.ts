@@ -431,6 +431,8 @@ class EscrowManager {
     winnerAddress: string,
     winnerPayout: number,
     platformCut: number,
+    secondAddress?: string,
+    secondPayout?: number,
   ): Promise<{ success: boolean; txid?: string; error?: string }> {
     if (!this.initialized) return { success: false, error: 'EscrowManager not initialized' };
 
@@ -462,12 +464,17 @@ class EscrowManager {
       }
 
       // Split based on actual funds available, not expected amounts
-      const totalExpected = winnerPayout + platformCut;
+      const totalExpected = winnerPayout + platformCut + (secondPayout || 0);
       const winnerShare = totalExpected > 0 ? winnerPayout / totalExpected : 0.5;
       const adjWinner = Math.floor(distributable * winnerShare);
-      const adjPlatform = distributable - adjWinner;
+      let adjSecond = 0;
+      if (secondAddress && secondPayout) {
+        const secondShare = totalExpected > 0 ? secondPayout / totalExpected : 0;
+        adjSecond = Math.floor(distributable * secondShare);
+      }
+      const adjPlatform = distributable - adjWinner - adjSecond;
 
-      console.log(`💰 Distributable: ${distributable} sats | Winner: ${adjWinner} (${Math.round(winnerShare * 100)}%) | Platform: ${adjPlatform}`);
+      console.log(`💰 Distributable: ${distributable} sats | Winner: ${adjWinner} (${Math.round(winnerShare * 100)}%)${adjSecond ? ` | Second: ${adjSecond}` : ''} | Platform: ${adjPlatform}`);
 
       const tx = new Transaction();
       for (const u of utxos) {
@@ -486,20 +493,32 @@ class EscrowManager {
         tx.addOutput({ lockingScript: new P2PKH().lock(winnerAddress), satoshis: adjWinner });
       }
 
+      // Second recipient (e.g. draw refund)
+      if (secondAddress && adjSecond > DUST_LIMIT) {
+        tx.addOutput({ lockingScript: new P2PKH().lock(secondAddress), satoshis: adjSecond });
+      }
+
       // Platform payout
       if (adjPlatform > DUST_LIMIT) {
         tx.addOutput({ lockingScript: new P2PKH().lock(finalWallet), satoshis: adjPlatform });
       }
 
       // OP_RETURN game record
-      tx.addOutput({ lockingScript: opReturn(JSON.stringify({
+      const opReturnData: Record<string, any> = {
         p: 'HERDSWACKER', a: 'SETTLE', g: gameId.slice(0, 8),
         e: escrowAddr.slice(0, 8), w: winnerAddress.slice(0, 8),
         wp: adjWinner, pc: adjPlatform, fee: feeEstimate,
-      })), satoshis: 0 });
+      };
+      if (secondAddress && adjSecond > DUST_LIMIT) {
+        opReturnData.s2 = secondAddress.slice(0, 8);
+        opReturnData.sp = adjSecond;
+      }
+      tx.addOutput({ lockingScript: opReturn(JSON.stringify(opReturnData)), satoshis: 0 });
 
       // Change back to escrow (shouldn't have any, but just in case)
-      const totalOut = (adjWinner > DUST_LIMIT ? adjWinner : 0) + (adjPlatform > DUST_LIMIT ? adjPlatform : 0);
+      const totalOut = (adjWinner > DUST_LIMIT ? adjWinner : 0)
+        + (adjSecond > DUST_LIMIT ? adjSecond : 0)
+        + (adjPlatform > DUST_LIMIT ? adjPlatform : 0);
       const change = available - totalOut - feeEstimate;
       if (change > DUST_LIMIT) {
         tx.addOutput({ lockingScript: new P2PKH().lock(escrowAddr), satoshis: change });
@@ -509,7 +528,7 @@ class EscrowManager {
 
       const result = await broadcastRawTx(tx.toHex());
       if (result.success) {
-        console.log(`💸 Settlement: ${adjWinner} → winner, ${adjPlatform} → platform, fee ${feeEstimate} (${result.txid})`);
+        console.log(`💸 Settlement: ${adjWinner} → winner${adjSecond ? `, ${adjSecond} → second` : ''}, ${adjPlatform} → platform, fee ${feeEstimate} (${result.txid})`);
         return { success: true, txid: result.txid };
       }
 

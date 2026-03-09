@@ -8,7 +8,7 @@ BSV Tank Wars — a real-time multiplayer artillery duel game with BSV blockchai
 
 ## Commands
 
-### Server (from `server/`)
+### Server (from repo root)
 ```bash
 npm install
 npm run dev          # ts-node-dev with auto-restart
@@ -30,7 +30,7 @@ Both require `.env` files — copy from `.env.example` and configure.
 
 **Server-authoritative design**: All game logic (terrain generation, projectile physics, damage calculation, turn management, payment verification) runs on the server. Clients receive shot results and animate them.
 
-### Server (`server/src/`)
+### Server (`src/` at repo root)
 - **`index.ts`** — Express + Socket.IO entry point (default port 3002)
 - **`game/TankGameManager.ts`** — Core game state machine. Manages game lifecycle: create → awaiting_wagers → playing → gameover. Contains physics simulation (`simulateShot`), terrain generation (10 styles), damage calculation, turn timers (30s), disconnect grace period (120s)
 - **`game/Constants.ts`** — Single source of truth for physics constants, stake tiers, damage formulas, payment calculations, price conversion
@@ -54,13 +54,12 @@ Both require `.env` files — copy from `.env.example` and configure.
 1. Players create/unlock PIN-encrypted BSV wallet → join lobby
 2. Matchmaking (queue or direct challenge) → `match_found` with terrain + positions
 3. Both pay deposit to per-game escrow address → `awaiting_wagers`
-4. Terrain drawing phase → both submit custom terrain → merged on server
-5. Turn-based play: set angle/power → `fire_shot` → server simulates → `shot_result` with trajectory
+4. Turn-based play: set angle/power → `fire_shot` → server simulates → `shot_result` with trajectory
 6. Hits trigger damage payments (damage% of baseSats). Tank destroyed (HP=0) → winner gets opponent's deposit minus 3% platform cut
 7. Settlement TX broadcast, game recorded to DB
 
 ### Key Conventions
-- **Dual constants**: Physics/tier constants are defined in both `server/src/game/Constants.ts` and `client/src/constants.ts` — keep them in sync
+- **Dual constants**: Physics/tier constants are defined in both `src/game/Constants.ts` and `client/src/constants.ts` — keep them in sync
 - **PlayerSlot**: Players are identified as `'player1'` or `'player2'` throughout
 - **GamePhase**: Server uses `'awaiting_wagers' | 'playing' | 'gameover'`; client adds `'lobby' | 'matchmaking' | 'drawing_terrain'`
 - **Socket events**: All defined in `SocketHandler.ts` (server) and `useMultiplayer.ts` (client). See README for the full event list

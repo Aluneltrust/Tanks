@@ -471,7 +471,7 @@ export class TankGameManager {
 
     return {
       winner, loser, reason,
-      pot: game.pot + game.depositSats * 2,
+      pot: game.pot,
       winnerPayout, loserPayout: 0, platformCut: totalPlatformCut,
       p1Address: game.player1.address,
       p2Address: game.player2.address,
@@ -492,7 +492,7 @@ export class TankGameManager {
 
     return {
       winner: null, loser: null, reason,
-      pot: game.pot + game.depositSats * 2,
+      pot: game.pot,
       winnerPayout: depositReturn, loserPayout: depositReturn, platformCut,
       p1Address: game.player1.address,
       p2Address: game.player2.address,

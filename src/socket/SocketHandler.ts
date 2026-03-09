@@ -548,21 +548,13 @@ export function setupSocketHandlers(io: Server): void {
         }
       }
     } else {
-      // Draw — refund both players
+      // Draw — refund both players in one TX
       if (result.pot > 0 && result.winnerPayout > 546) {
-        // Settle P1's refund
-        const tx1 = await escrowManager.settle(
+        const tx = await escrowManager.settle(
           game.id, result.p1Address, result.winnerPayout,
-          result.platformCut,
+          result.platformCut, result.p2Address, result.loserPayout,
         );
-        if (tx1.success) settleTxid = tx1.txid || '';
-        // Settle P2's refund from remaining escrow
-        if (result.loserPayout > 546) {
-          const tx2 = await escrowManager.settle(
-            game.id, result.p2Address, result.loserPayout, 0,
-          );
-          if (tx2.success && !settleTxid) settleTxid = tx2.txid || '';
-        }
+        if (tx.success) settleTxid = tx.txid || '';
       }
     }
 
