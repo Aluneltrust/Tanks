@@ -157,6 +157,16 @@ class SpentUTXOTracker {
     this.expiry.delete(key);
   }
 
+  /** Release all UTXOs claimed by a specific game (on cancel/end). */
+  releaseGame(gameId: string): void {
+    for (const [key, gid] of this.claimed) {
+      if (gid === gameId) {
+        this.claimed.delete(key);
+        this.expiry.delete(key);
+      }
+    }
+  }
+
   private pruneExpired(): void {
     const now = Date.now();
     for (const [key, exp] of this.expiry) {

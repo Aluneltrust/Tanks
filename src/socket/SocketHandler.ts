@@ -6,7 +6,7 @@ import { Server, Socket } from 'socket.io';
 import { gameManager, PlayerSlot, GameOverResult } from '../game/TankGameManager';
 import { matchmakingQueue } from '../game/Matchmaking';
 import { getTierByValue } from '../game/Constants';
-import { escrowManager, priceService, fetchBalance, verifyAndBroadcastTx } from '../wallet/BsvService';
+import { escrowManager, priceService, fetchBalance, verifyAndBroadcastTx, spentTracker } from '../wallet/BsvService';
 import * as db from '../DB/Database';
 import { socketRateLimiter } from './SocketRateLimiter';
 import { sessionManager } from './SessionManager';
@@ -456,6 +456,7 @@ export function setupSocketHandlers(io: Server): void {
         const game = gameManager.getGame(gameResult.gameId);
 
         if (gameResult.immediateResult && !gameResult.graceStarted) {
+          spentTracker.releaseGame(gameResult.gameId);
           sessionManager.revokeBySocket(socket.id);
           const opp = gameManager.opponentSlot(gameResult.slot);
 
@@ -592,6 +593,9 @@ export function setupSocketHandlers(io: Server): void {
         { shotsFired: p2.shotsFired, damageDealt: p2.damageDealt },
       );
     } catch (err) { console.error('DB record failed:', err); }
+
+    // Release UTXO claims so the same coins can be used in the next game
+    spentTracker.releaseGame(game.id);
 
     lobbyManager.setStatus(p1.socketId, 'idle');
     lobbyManager.setStatus(p2.socketId, 'idle');
