@@ -25,27 +25,32 @@ const SOUND_PATHS: Record<SoundName, string> = {
   engine_idle: '/audio/engine-idle.mp3',
 };
 
-// Volume per sound (0–1)
-const SOUND_VOLUMES: Partial<Record<SoundName, number>> = {
-  fire: 0.7,
-  hit: 0.6,
-  explosion: 0.8,
-  miss: 0.3,
-  move: 0.2,
+// Target volume per sound (0–1), multiplied by masterVolume
+const SOUND_VOLUMES: Record<SoundName, number> = {
+  fire: 0.8,
+  hit: 0.7,
+  explosion: 0.9,
+  miss: 0.35,
+  move: 0.35,
   match: 0.5,
-  victory: 0.6,
-  defeat: 0.5,
-  engine_idle: 0.15,
+  victory: 0.7,
+  defeat: 0.6,
+  engine_idle: 0.2,
 };
+
+interface LoopHandle {
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+}
 
 class AudioManager {
   private buffers = new Map<SoundName, AudioBuffer>();
   private ctx: AudioContext | null = null;
-  private masterVolume = 0.6;
+  private masterVolume = 0.7;
   private loaded = false;
-  private loopSource: AudioBufferSourceNode | null = null;
-  private loopGain: GainNode | null = null;
-  private loopName: SoundName | null = null;
+
+  // Named loops — supports multiple concurrent loops
+  private loops = new Map<SoundName, LoopHandle>();
 
   /** Call once after first user interaction (click/tap) to unlock audio. */
   async init(): Promise<void> {
@@ -57,10 +62,7 @@ class AudioManager {
       entries.map(async ([name, path]) => {
         try {
           const res = await fetch(path);
-          if (!res.ok) {
-            console.warn(`Audio not found: ${path}`);
-            return;
-          }
+          if (!res.ok) { console.warn(`Audio not found: ${path}`); return; }
           const arrayBuf = await res.arrayBuffer();
           const audioBuf = await this.ctx!.decodeAudioData(arrayBuf);
           this.buffers.set(name, audioBuf);
@@ -72,84 +74,86 @@ class AudioManager {
     this.loaded = true;
   }
 
-  /** Play a sound effect by name. */
+  private ensureResumed(): boolean {
+    if (!this.ctx || !this.loaded) return false;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return true;
+  }
+
+  /** Play a one-shot sound effect. */
   play(name: SoundName): void {
-    if (!this.ctx || !this.loaded) return;
+    if (!this.ensureResumed()) return;
     const buffer = this.buffers.get(name);
     if (!buffer) return;
 
-    // Resume context if suspended (browser autoplay policy)
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
-
-    const source = this.ctx.createBufferSource();
+    const source = this.ctx!.createBufferSource();
     source.buffer = buffer;
-
-    const gain = this.ctx.createGain();
-    gain.gain.value = this.masterVolume * (SOUND_VOLUMES[name] ?? 0.5);
-
+    const gain = this.ctx!.createGain();
+    gain.gain.value = this.masterVolume * SOUND_VOLUMES[name];
     source.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.ctx!.destination);
     source.start(0);
   }
 
-  /** Start a looping sound (e.g. engine idle). Only one loop at a time. */
-  startLoop(name: SoundName): void {
-    if (!this.ctx || !this.loaded) return;
-    if (this.loopName === name) return; // already playing
-    this.stopLoop();
+  /** Start a named looping sound. Fades in over fadeIn seconds. */
+  startLoop(name: SoundName, fadeIn = 0.4): void {
+    if (!this.ensureResumed()) return;
+    if (this.loops.has(name)) return; // already playing
 
     const buffer = this.buffers.get(name);
     if (!buffer) return;
 
-    if (this.ctx.state === 'suspended') this.ctx.resume();
-
-    const source = this.ctx.createBufferSource();
+    const source = this.ctx!.createBufferSource();
     source.buffer = buffer;
     source.loop = true;
 
-    const gain = this.ctx.createGain();
-    gain.gain.value = 0; // start silent
-    // Fade in
-    gain.gain.linearRampToValueAtTime(
-      this.masterVolume * (SOUND_VOLUMES[name] ?? 0.15),
-      this.ctx.currentTime + 0.5,
-    );
+    const gain = this.ctx!.createGain();
+    const targetVol = this.masterVolume * SOUND_VOLUMES[name];
+    gain.gain.setValueAtTime(0, this.ctx!.currentTime);
+    gain.gain.linearRampToValueAtTime(targetVol, this.ctx!.currentTime + fadeIn);
 
     source.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.ctx!.destination);
     source.start(0);
 
-    this.loopSource = source;
-    this.loopGain = gain;
-    this.loopName = name;
+    this.loops.set(name, { source, gain });
   }
 
-  /** Stop the current looping sound with a short fade out. */
-  stopLoop(): void {
-    if (!this.ctx || !this.loopSource || !this.loopGain) return;
-    const gain = this.loopGain;
-    const source = this.loopSource;
+  /** Stop a named loop with fade out. */
+  stopLoop(name: SoundName, fadeOut = 0.3): void {
+    const handle = this.loops.get(name);
+    if (!handle || !this.ctx) return;
 
-    // Fade out over 0.4s then stop
+    this.loops.delete(name);
+    const { source, gain } = handle;
     gain.gain.setValueAtTime(gain.gain.value, this.ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.4);
-    setTimeout(() => {
-      try { source.stop(); } catch { /* already stopped */ }
-    }, 500);
+    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + fadeOut);
+    setTimeout(() => { try { source.stop(); } catch { /* ok */ } }, (fadeOut + 0.1) * 1000);
+  }
 
-    this.loopSource = null;
-    this.loopGain = null;
-    this.loopName = null;
+  /** Stop ALL loops (game over / leave). */
+  stopAllLoops(fadeOut = 0.3): void {
+    for (const name of [...this.loops.keys()]) {
+      this.stopLoop(name, fadeOut);
+    }
+  }
+
+  /** Crossfade: stop one loop and start another. */
+  crossfade(from: SoundName, to: SoundName, duration = 0.3): void {
+    this.stopLoop(from, duration);
+    this.startLoop(to, duration);
+  }
+
+  isLoopPlaying(name: SoundName): boolean {
+    return this.loops.has(name);
   }
 
   setVolume(vol: number): void {
     this.masterVolume = Math.max(0, Math.min(1, vol));
-    // Update loop volume if playing
-    if (this.loopGain && this.loopName && this.ctx) {
-      this.loopGain.gain.setValueAtTime(
-        this.masterVolume * (SOUND_VOLUMES[this.loopName] ?? 0.15),
+    if (!this.ctx) return;
+    for (const [name, handle] of this.loops) {
+      handle.gain.gain.setValueAtTime(
+        this.masterVolume * SOUND_VOLUMES[name],
         this.ctx.currentTime,
       );
     }

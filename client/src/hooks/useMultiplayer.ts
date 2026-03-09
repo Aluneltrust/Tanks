@@ -62,6 +62,7 @@ export function useMultiplayer() {
   const [incomingChallenge, setIncomingChallenge] = useState<any>(null);
 
   const socketRef = useRef<Socket | null>(null);
+  const moveStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connect = useCallback(() => {
     if (socketRef.current) return;
@@ -162,7 +163,7 @@ export function useMultiplayer() {
       setDrawOffered(false);
       setMessage(data.message);
       localStorage.removeItem(STORAGE_KEYS.GAME_ID);
-      audioManager.stopLoop();
+      audioManager.stopAllLoops();
       audioManager.play(data.payout > 0 ? 'victory' : 'defeat');
     });
 
@@ -282,7 +283,18 @@ export function useMultiplayer() {
 
   const moveTank = useCallback((x: number) => {
     socketRef.current?.emit('move_tank', { x });
-    audioManager.play('move');
+
+    // Crossfade idle → move if not already moving
+    if (!audioManager.isLoopPlaying('move')) {
+      audioManager.crossfade('engine_idle', 'move', 0.2);
+    }
+
+    // Reset the stop timer — crossfade back to idle after 200ms of no movement
+    if (moveStopTimer.current) clearTimeout(moveStopTimer.current);
+    moveStopTimer.current = setTimeout(() => {
+      audioManager.crossfade('move', 'engine_idle', 0.3);
+      moveStopTimer.current = null;
+    }, 200);
   }, []);
 
   const submitTerrain = useCallback((heights: number[]) => {
@@ -334,7 +346,7 @@ export function useMultiplayer() {
   }, [lastShot]);
 
   const resetGame = useCallback(() => {
-    audioManager.stopLoop();
+    audioManager.stopAllLoops();
     setGamePhase('lobby');
     setGameId('');
     setPot(0);
