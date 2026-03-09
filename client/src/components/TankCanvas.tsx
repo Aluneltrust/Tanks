@@ -606,12 +606,44 @@ export default function TankCanvas(props: Props) {
         let sy = tipY - Math.sin(aR) * barrelLen;
         let svx = Math.cos(aR) * spd, svy = -Math.sin(aR) * spd;
 
+        const t = now; // animation time
         for (let i = 0; i < 20; i++) {
           sx += svx; sy += svy; svy += GRAVITY; svx += P.wind * .003;
           const fade = 1 - i / 20;
-          ctx.fillStyle = `rgba(255,210,50,${.5 * fade})`;
-          ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, Math.PI * 2); ctx.fill();
+          // Pulsing size: each dot pulses at a staggered phase
+          const pulse = .8 + .4 * Math.sin(t * 5 + i * .6);
+          const baseR = (3.5 - i * .08) * pulse;
+
+          // Fire core glow
+          ctx.globalAlpha = (.45 + .15 * pulse) * fade;
+          const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, baseR * 2.2);
+          glow.addColorStop(0, `rgba(255,${180 - i * 4},0,1)`);
+          glow.addColorStop(.4, `rgba(255,${100 - i * 3},0,.6)`);
+          glow.addColorStop(1, 'rgba(80,20,0,0)');
+          ctx.fillStyle = glow;
+          ctx.beginPath(); ctx.arc(sx, sy, baseR * 2.2, 0, Math.PI * 2); ctx.fill();
+
+          // Bright fire center
+          ctx.globalAlpha = (.6 + .2 * pulse) * fade;
+          ctx.fillStyle = `rgb(255,${220 - i * 5},${80 - i * 3})`;
+          ctx.beginPath(); ctx.arc(sx, sy, baseR, 0, Math.PI * 2); ctx.fill();
+
+          // Hot white core (first few dots only)
+          if (i < 8) {
+            ctx.globalAlpha = (.5 + .2 * pulse) * fade;
+            ctx.fillStyle = '#fff8e0';
+            ctx.beginPath(); ctx.arc(sx, sy, baseR * .4, 0, Math.PI * 2); ctx.fill();
+          }
+
+          // Smoke wisps (trailing dots)
+          if (i > 6) {
+            const smokeOff = Math.sin(t * 3 + i * 1.2) * 3;
+            ctx.globalAlpha = .12 * fade;
+            ctx.fillStyle = '#888';
+            ctx.beginPath(); ctx.arc(sx + smokeOff, sy - 2, baseR * 1.4, 0, Math.PI * 2); ctx.fill();
+          }
         }
+        ctx.globalAlpha = 1;
       }
 
       // ===== PROJECTILE =====
