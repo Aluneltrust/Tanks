@@ -93,13 +93,12 @@ export class BsvWalletService {
         satoshis: 0,
       });
 
-      // Fee calculation and change
-      await tx.fee(new SatoshisPerKilobyte(1));
-      // Add change output back to sender
+      // Change output must be added before fee calculation
       tx.addOutput({
         lockingScript: new P2PKH().lock(address),
         change: true,
       });
+      await tx.fee(new SatoshisPerKilobyte(1));
       await tx.sign();
 
       const rawTxHex = tx.toHex();
