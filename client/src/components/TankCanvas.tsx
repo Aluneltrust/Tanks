@@ -439,6 +439,12 @@ export default function TankCanvas(props: Props) {
         const facingLeft = slot === 'player2';
         const anim = ta[slot === 'player1' ? 'p1' : 'p2'];
 
+        // Terrain slope — sample terrain ~20px on each side for a smooth tilt
+        const slopeSpan = 20;
+        const leftY = getTY(Math.max(0, px - slopeSpan));
+        const rightY = getTY(Math.min(W - 1, px + slopeSpan));
+        const slopeAngle = Math.atan2(rightY - leftY, slopeSpan * 2);
+
         // Idle bob — subtle floating motion
         const idleBob = Math.sin(now * 1.5 + (slot === 'player1' ? 0 : Math.PI)) * 1.2;
 
@@ -484,7 +490,7 @@ export default function TankCanvas(props: Props) {
 
         ctx.save();
         ctx.translate(px + recoilX, ty + idleBob);
-        ctx.rotate(hitTilt);
+        ctx.rotate(slopeAngle + hitTilt);
         if (facingLeft) ctx.scale(-1, 1);
 
         if (bodyImg && turretImg) {
