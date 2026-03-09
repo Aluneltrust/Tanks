@@ -610,8 +610,9 @@ export default function TankCanvas(props: Props) {
         for (let i = 0; i < 20; i++) {
           sx += svx; sy += svy; svy += GRAVITY; svx += P.wind * .003;
           const fade = 1 - i / 20;
-          // Pulsing size: each dot pulses at a staggered phase
-          const pulse = .8 + .4 * Math.sin(t * 5 + i * .6);
+          // Pulse wave traveling outward from barrel
+          const wave = Math.sin(t * 6 - i * .5);
+          const pulse = .7 + .5 * Math.max(0, wave);
           const baseR = (3.5 - i * .08) * pulse;
 
           // Fire core glow
