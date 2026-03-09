@@ -60,13 +60,16 @@ export class BsvWalletService {
       // Add inputs until we cover amountSats + estimated fee
       let inputTotal = 0;
       for (const u of utxos) {
+        // Fetch source TX hex for proper input linking
+        const srcRes = await fetch(`${wocBase}/tx/${u.tx_hash}/hex`);
+        if (!srcRes.ok) throw new Error(`Failed to fetch source TX ${u.tx_hash}`);
+        const srcHex = await srcRes.text();
+
         tx.addInput({
-          sourceTransaction: undefined as any,
+          sourceTransaction: Transaction.fromHex(srcHex),
           sourceOutputIndex: u.tx_pos,
-          sourceTXID: u.tx_hash,
           sequence: 0xffffffff,
           unlockingScriptTemplate: new P2PKH().unlock(this.privateKey),
-          satoshis: u.value,
         });
         inputTotal += u.value;
         // Rough estimate: need amount + ~500 sats for fee headroom
@@ -83,19 +86,20 @@ export class BsvWalletService {
 
       // OP_RETURN tag: game metadata
       const opReturnData = `bsv_tanks|${gameId}|${type}`;
+      const opReturnHex = Array.from(new TextEncoder().encode(opReturnData))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
       tx.addOutput({
-        lockingScript: Script.buildSafeDataOutput([opReturnData]),
+        lockingScript: Script.fromASM(`OP_FALSE OP_RETURN ${opReturnHex}`),
         satoshis: 0,
       });
 
-      // Change output back to sender
+      // Fee calculation and change
+      await tx.fee(new SatoshisPerKilobyte(1));
+      // Add change output back to sender
       tx.addOutput({
         lockingScript: new P2PKH().lock(address),
-        change: true as any,
+        change: true,
       });
-
-      // Set fee model and sign
-      await tx.fee(new SatoshisPerKilobyte(1));
       await tx.sign();
 
       const rawTxHex = tx.toHex();

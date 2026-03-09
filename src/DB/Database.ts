@@ -19,6 +19,8 @@ export function getPool(): Pool {
 
 export async function initDatabase(): Promise<void> {
   const db = getPool();
+
+  // Create tables
   await db.query(`
     CREATE TABLE IF NOT EXISTS players (
       address       TEXT PRIMARY KEY,
@@ -34,28 +36,45 @@ export async function initDatabase(): Promise<void> {
 
     CREATE TABLE IF NOT EXISTS games (
       id              TEXT PRIMARY KEY,
-      stake_tier      INTEGER NOT NULL,
-      p1_address      TEXT NOT NULL,
-      p2_address      TEXT NOT NULL,
-      winner_address  TEXT,
-      end_reason      TEXT,
-      pot             BIGINT NOT NULL DEFAULT 0,
-      winner_payout   BIGINT NOT NULL DEFAULT 0,
-      platform_cut    BIGINT NOT NULL DEFAULT 0,
-      settle_txid     TEXT,
-      p1_shots        INTEGER DEFAULT 0,
-      p2_shots        INTEGER DEFAULT 0,
-      p1_damage       INTEGER DEFAULT 0,
-      p2_damage       INTEGER DEFAULT 0,
-      started_at      TIMESTAMPTZ DEFAULT NOW(),
-      ended_at        TIMESTAMPTZ,
+      stake_tier      INTEGER NOT NULL DEFAULT 0,
       created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
 
+  // Add columns if missing (safe for existing tables)
+  const gamesCols: [string, string][] = [
+    ['p1_address',     'TEXT NOT NULL DEFAULT \'\''],
+    ['p2_address',     'TEXT NOT NULL DEFAULT \'\''],
+    ['winner_address', 'TEXT'],
+    ['end_reason',     'TEXT'],
+    ['pot',            'BIGINT NOT NULL DEFAULT 0'],
+    ['winner_payout',  'BIGINT NOT NULL DEFAULT 0'],
+    ['platform_cut',   'BIGINT NOT NULL DEFAULT 0'],
+    ['settle_txid',    'TEXT'],
+    ['p1_shots',       'INTEGER DEFAULT 0'],
+    ['p2_shots',       'INTEGER DEFAULT 0'],
+    ['p1_damage',      'INTEGER DEFAULT 0'],
+    ['p2_damage',      'INTEGER DEFAULT 0'],
+    ['started_at',     'TIMESTAMPTZ DEFAULT NOW()'],
+    ['ended_at',       'TIMESTAMPTZ'],
+  ];
+
+  for (const [col, def] of gamesCols) {
+    await db.query(
+      `DO $$ BEGIN
+         ALTER TABLE games ADD COLUMN ${col} ${def};
+       EXCEPTION WHEN duplicate_column THEN NULL;
+       END $$;`
+    );
+  }
+
+  // Create indexes
+  await db.query(`
     CREATE INDEX IF NOT EXISTS idx_games_p1 ON games(p1_address);
     CREATE INDEX IF NOT EXISTS idx_games_p2 ON games(p2_address);
     CREATE INDEX IF NOT EXISTS idx_players_wins ON players(games_won DESC);
   `);
+
   console.log('✅ Database initialized (PostgreSQL)');
 }
 

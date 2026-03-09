@@ -16,7 +16,7 @@ function pinToKeyMaterial(pin: string): Promise<CryptoKey> {
 async function deriveKey(pin: string, salt: Uint8Array): Promise<CryptoKey> {
   const keyMaterial = await pinToKeyMaterial(pin);
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: salt.buffer as ArrayBuffer, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -67,8 +67,8 @@ export async function encryptAndStoreWif(
   );
 
   const payload = JSON.stringify({
-    salt: toBase64(salt),
-    iv: toBase64(iv),
+    salt: toBase64(salt.buffer as ArrayBuffer),
+    iv: toBase64(iv.buffer as ArrayBuffer),
     ct: toBase64(ciphertext),
   });
 
@@ -85,10 +85,12 @@ export async function decryptStoredWif(pin: string): Promise<string> {
   const key = await deriveKey(pin, fromBase64(salt));
 
   try {
+    const ivBuf = fromBase64(iv);
+    const ctBuf = fromBase64(ct);
     const plainBuf = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: fromBase64(iv) },
+      { name: 'AES-GCM', iv: ivBuf.buffer as ArrayBuffer },
       key,
-      fromBase64(ct),
+      ctBuf.buffer as ArrayBuffer,
     );
     return new TextDecoder().decode(plainBuf);
   } catch {
