@@ -6,6 +6,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { BACKEND_URL, STORAGE_KEYS } from '../constants';
 import { setSessionToken } from '../services';
+import { audioManager } from '../components/AudioManager';
 
 export type GamePhase = 'lobby' | 'matchmaking' | 'awaiting_wagers' | 'drawing_terrain' | 'playing' | 'gameover';
 export type PlayerSlot = 'player1' | 'player2';
@@ -93,6 +94,7 @@ export function useMultiplayer() {
       setGamePhase('awaiting_wagers');
       setMessage(`Matched with ${data.opponent.username}! Pay deposit to start.`);
       localStorage.setItem(STORAGE_KEYS.GAME_ID, data.gameId);
+      audioManager.play('match');
     });
 
     socket.on('wager_result', (data) => {
@@ -134,8 +136,7 @@ export function useMultiplayer() {
     socket.on('shot_result', (data: ShotResultData) => {
       setLastShot(data);
       setAnimatingShot(true);
-      // After animation completes, update state
-      // (the game canvas component handles the animation timing)
+      audioManager.play('fire');
     });
 
     socket.on('tank_moved', (data: { slot: PlayerSlot; x: number }) => {
@@ -160,6 +161,7 @@ export function useMultiplayer() {
       setDrawOffered(false);
       setMessage(data.message);
       localStorage.removeItem(STORAGE_KEYS.GAME_ID);
+      audioManager.play(data.payout > 0 ? 'victory' : 'defeat');
     });
 
     socket.on('opponent_disconnected', (data) => {
@@ -277,6 +279,7 @@ export function useMultiplayer() {
 
   const moveTank = useCallback((x: number) => {
     socketRef.current?.emit('move_tank', { x });
+    audioManager.play('move');
   }, []);
 
   const submitTerrain = useCallback((heights: number[]) => {
@@ -319,8 +322,10 @@ export function useMultiplayer() {
     setCurrentTurn(lastShot.currentTurn);
     setAnimatingShot(false);
     if (lastShot.hit) {
+      audioManager.play(lastShot.directHit ? 'explosion' : 'hit');
       setMessage(`${lastShot.directHit ? 'DIRECT HIT!' : 'Hit!'} ${lastShot.damage} damage!`);
     } else {
+      audioManager.play('miss');
       setMessage('Miss!');
     }
   }, [lastShot]);

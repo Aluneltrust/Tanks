@@ -10,6 +10,7 @@ import { bsvWalletService, bsvPriceService, fetchBalance } from './services';
 import { hasStoredWallet, getAddressHint, encryptAndStoreWif, decryptStoredWif, deleteStoredWallet } from './services/pinCrypto';
 import TankCanvas from './components/TankCanvas';
 import TerrainDrawer from './components/TerrainDrawer';
+import { audioManager } from './components/AudioManager';
 
 export default function App() {
   // Wallet state
@@ -90,6 +91,7 @@ export default function App() {
   // ============================================================================
 
   const doCreateWallet = async () => {
+    audioManager.init(); // unlock audio on first interaction
     if (!username.trim()) { setLoginError('Enter a username'); return; }
     if (pin.length < 4) { setLoginError('PIN must be at least 4 digits'); return; }
     setLoginLoading(true);
@@ -108,6 +110,7 @@ export default function App() {
   };
 
   const doUnlockWallet = async () => {
+    audioManager.init(); // unlock audio on first interaction
     if (pin.length < 4) { setLoginError('Enter your PIN'); return; }
     setLoginLoading(true);
     try {
