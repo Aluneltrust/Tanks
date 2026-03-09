@@ -503,13 +503,13 @@ export default function TankCanvas(props: Props) {
           const brlW = turretImg.width * barrelScale;
           const brlH = turretImg.height * barrelScale;
 
-          // Body
-          ctx.drawImage(bodyImg, -bw / 2, -bh + 4, bw, bh);
+          // Body — sit on top of terrain
+          ctx.drawImage(bodyImg, -bw / 2, -bh, bw, bh);
 
           // Barrel — pivot at the right edge of turret dome where barrel exits
           // This is roughly at x = bw * 0.15 from center, y = top of turret area
           ctx.save();
-          ctx.translate(bw * .15, -bh * .62); // barrel mount point at turret edge
+          ctx.translate(bw * .15, -bh * .66); // barrel mount point at turret edge
           // In the flipped coordinate system (player 2), we need to mirror the angle
           // so the barrel direction matches the trajectory direction
           const effectiveAngle = facingLeft ? (180 - angle) : angle;
@@ -526,20 +526,20 @@ export default function TankCanvas(props: Props) {
 
           // Tracks
           ctx.fillStyle = '#1a1a1a';
-          ctx.fillRect(-tankW / 2, -4, tankW, 12);
+          ctx.fillRect(-tankW / 2, -10, tankW, 10);
           // Wheels — animate rotation when moving
           ctx.fillStyle = '#444';
           for (let i = -2; i <= 2; i++) {
             ctx.beginPath();
-            ctx.arc(i * 6, 2, 3, 0, Math.PI * 2);
+            ctx.arc(i * 6, -5, 3, 0, Math.PI * 2);
             ctx.fill();
             // Wheel spoke
             ctx.strokeStyle = '#555';
             ctx.lineWidth = .6;
             const wheelAngle = now * (anim.moving ? 12 : 0) + i;
             ctx.beginPath();
-            ctx.moveTo(i * 6 + Math.cos(wheelAngle) * 2, 2 + Math.sin(wheelAngle) * 2);
-            ctx.lineTo(i * 6 - Math.cos(wheelAngle) * 2, 2 - Math.sin(wheelAngle) * 2);
+            ctx.moveTo(i * 6 + Math.cos(wheelAngle) * 2, -5 + Math.sin(wheelAngle) * 2);
+            ctx.lineTo(i * 6 - Math.cos(wheelAngle) * 2, -5 - Math.sin(wheelAngle) * 2);
             ctx.stroke();
           }
 
@@ -616,7 +616,7 @@ export default function TankCanvas(props: Props) {
         // Barrel mount point in tank-local coords (before flip)
         // From drawTank PNG path: translate(bw*.15, -bh*.62) with 55px body
         const mountLocalX = 8; // bw * .15 ≈ 8
-        const mountLocalY = -21; // -bh * .62 ≈ -21
+        const mountLocalY = -24; // -bh * .66 ≈ -24
 
         // Apply flip then slope rotation to get mount point in world coords
         const mx = mountLocalX * flipSign;
@@ -632,7 +632,6 @@ export default function TankCanvas(props: Props) {
 
         const t = now; // animation time
         for (let i = 0; i < 20; i++) {
-          sx += svx; sy += svy; svy += GRAVITY; svx += P.wind * .003;
           const fade = 1 - i / 20;
           // Pulse wave traveling outward from barrel
           const wave = Math.sin(t * 6 - i * .5);
@@ -667,6 +666,9 @@ export default function TankCanvas(props: Props) {
             ctx.fillStyle = '#888';
             ctx.beginPath(); ctx.arc(sx + smokeOff, sy - 2, baseR * 1.4, 0, Math.PI * 2); ctx.fill();
           }
+
+          // Advance position after drawing
+          sx += svx; sy += svy; svy += GRAVITY; svx += P.wind * .003;
         }
         ctx.globalAlpha = 1;
       }
