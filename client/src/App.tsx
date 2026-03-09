@@ -54,10 +54,24 @@ export default function App() {
     return () => clearInterval(iv);
   }, [walletAddress]);
 
-  // Join lobby when connected + wallet ready
+  // Join lobby when connected + wallet ready (but not if reconnecting to a game)
   useEffect(() => {
     if (mp.isConnected && walletAddress && username) {
-      mp.joinLobby(walletAddress, username);
+      // Try reconnecting first; if no saved game, join lobby
+      const savedGameId = localStorage.getItem(STORAGE_KEYS.GAME_ID);
+      if (!savedGameId) {
+        mp.joinLobby(walletAddress, username);
+      } else {
+        // Reconnect attempt already fired from useMultiplayer on connect.
+        // Join lobby after a short delay to let reconnect_result arrive first.
+        const timer = setTimeout(() => {
+          // Only join lobby if still in lobby phase (reconnect didn't restore a game)
+          if (mp.gamePhase === 'lobby') {
+            mp.joinLobby(walletAddress, username);
+          }
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
     }
   }, [mp.isConnected, walletAddress, username]);
 
@@ -105,6 +119,8 @@ export default function App() {
       setWalletKey(pk);
       setWalletAddress(addr);
       bsvWalletService.connect(wif);
+      // Try to rejoin any active game after unlocking
+      mp.tryReconnect();
     } catch (err: any) {
       setLoginError(err.message === 'Wrong PIN' ? 'Wrong PIN' : err.message);
     }

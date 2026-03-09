@@ -189,7 +189,10 @@ export function useMultiplayer() {
         setMyWagerPaid(gs.myWagerPaid);
         setOpponentWagerPaid(gs.opponentWagerPaid);
         setGamePhase(gs.phase === 'gameover' ? 'gameover' : gs.phase);
-        setMessage('Reconnected!');
+        setMessage('Reconnected to your game!');
+      } else {
+        // Game no longer exists — clear stale ID
+        localStorage.removeItem(STORAGE_KEYS.GAME_ID);
       }
     });
 
@@ -240,15 +243,20 @@ export function useMultiplayer() {
     socketRef.current = socket;
   }, []);
 
-  // Auto-reconnect
-  useEffect(() => {
-    if (!isConnected) return;
+  // Attempt to rejoin a game saved in localStorage
+  const tryReconnect = useCallback(() => {
     const savedGameId = localStorage.getItem(STORAGE_KEYS.GAME_ID);
     const savedAddr = localStorage.getItem(STORAGE_KEYS.WALLET_ADDR);
-    if (savedGameId && savedAddr) {
-      socketRef.current?.emit('reconnect_game', { gameId: savedGameId, address: savedAddr });
+    if (savedGameId && savedAddr && socketRef.current?.connected) {
+      socketRef.current.emit('reconnect_game', { gameId: savedGameId, address: savedAddr });
     }
-  }, [isConnected]);
+  }, []);
+
+  // Auto-reconnect on every (re)connect — covers Socket.IO transport reconnects too
+  useEffect(() => {
+    if (!isConnected) return;
+    tryReconnect();
+  }, [isConnected, tryReconnect]);
 
   const findMatch = useCallback((address: string, username: string, stakeTier: number) => {
     socketRef.current?.emit('find_match', { address, username, stakeTier });
@@ -341,6 +349,6 @@ export function useMultiplayer() {
     connect, findMatch, cancelMatchmaking, submitWager, fireShot, moveTank, submitTerrain,
     offerDraw, acceptDraw, declineDraw, resign,
     joinLobby, refreshLobby, challengePlayer, acceptChallenge, declineChallenge,
-    finishShotAnimation, resetGame, setMessage,
+    finishShotAnimation, resetGame, setMessage, tryReconnect,
   };
 }
