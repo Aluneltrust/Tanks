@@ -601,15 +601,31 @@ export default function TankCanvas(props: Props) {
         const pow = P.mySlot === 'player1' ? P.p1Power : P.p2Power;
         const ty = getTY(tx);
         const aR = ang * Math.PI / 180, spd = pow * .14;
+        const facingLeft = P.mySlot === 'player2';
+        const flipSign = facingLeft ? -1 : 1;
 
-        // Barrel tip position — match the tank drawing's mount point + barrel length
-        const mountOffX = 10;
-        const mountOffY = -18;
-        const barrelLen = 30;
-        const tipX = tx + mountOffX * (P.mySlot === 'player2' ? -1 : 1);
-        const tipY = ty + mountOffY;
-        let sx = tipX + Math.cos(aR) * barrelLen;
-        let sy = tipY - Math.sin(aR) * barrelLen;
+        // Compute terrain slope (same as drawTank)
+        const slopeSpan = 20;
+        const sLeftY = getTY(Math.max(0, tx - slopeSpan));
+        const sRightY = getTY(Math.min(W - 1, tx + slopeSpan));
+        const slope = Math.atan2(sRightY - sLeftY, slopeSpan * 2);
+
+        // Barrel mount point in tank-local coords (before flip)
+        // From drawTank PNG path: translate(bw*.15, -bh*.62) with 80px body
+        const mountLocalX = 12; // bw * .15 ≈ 12
+        const mountLocalY = -30; // -bh * .62 ≈ -30
+
+        // Apply flip then slope rotation to get mount point in world coords
+        const mx = mountLocalX * flipSign;
+        const my = mountLocalY;
+        const mountWorldX = tx + mx * Math.cos(slope) - my * Math.sin(slope);
+        const mountWorldY = ty + mx * Math.sin(slope) + my * Math.cos(slope);
+
+        // Barrel tip: barrel extends along the fire angle from mount point
+        // The barrel length in the PNG is ~35px
+        const brlLen = 35;
+        let sx = mountWorldX + Math.cos(aR) * brlLen;
+        let sy = mountWorldY - Math.sin(aR) * brlLen;
         let svx = Math.cos(aR) * spd, svy = -Math.sin(aR) * spd;
 
         const t = now; // animation time
