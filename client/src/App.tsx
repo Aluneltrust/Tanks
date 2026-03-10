@@ -77,6 +77,29 @@ export default function App() {
     }
   }, [mp.isConnected, walletAddress, username]);
 
+  // Music — switch tracks based on game phase
+  useEffect(() => {
+    const phase = mp.gamePhase;
+    if (!walletKey) {
+      // Not logged in — no music
+      audioManager.stopAllLoops(0.5);
+      return;
+    }
+    if (phase === 'playing' || phase === 'gameover') {
+      // Battle music
+      if (!audioManager.isLoopPlaying('music_battle')) {
+        audioManager.stopLoop('music_lobby', 0.8);
+        audioManager.startLoop('music_battle', 0.8);
+      }
+    } else {
+      // Lobby / matchmaking / wager — lobby music
+      if (!audioManager.isLoopPlaying('music_lobby')) {
+        audioManager.stopLoop('music_battle', 0.8);
+        audioManager.startLoop('music_lobby', 0.8);
+      }
+    }
+  }, [mp.gamePhase, walletKey]);
+
   // Sync angle/power from mySlot
   useEffect(() => {
     if (mp.mySlot === 'player1') {

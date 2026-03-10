@@ -11,7 +11,9 @@ type SoundName =
   | 'match'
   | 'victory'
   | 'defeat'
-  | 'engine_idle';
+  | 'engine_idle'
+  | 'music_lobby'
+  | 'music_battle';
 
 const SOUND_PATHS: Record<SoundName, string> = {
   fire: '/audio/fire.mp3',
@@ -23,6 +25,8 @@ const SOUND_PATHS: Record<SoundName, string> = {
   victory: '/audio/victory.mp3',
   defeat: '/audio/defeat.mp3',
   engine_idle: '/audio/engine-idle.mp3',
+  music_lobby: '/audio/music-lobby.mp3',
+  music_battle: '/audio/music-battle.mp3',
 };
 
 // Target volume per sound (0–1), multiplied by masterVolume
@@ -36,6 +40,8 @@ const SOUND_VOLUMES: Record<SoundName, number> = {
   victory: 0.7,
   defeat: 0.6,
   engine_idle: 0.2,
+  music_lobby: 0.3,
+  music_battle: 0.35,
 };
 
 interface LoopHandle {
