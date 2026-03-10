@@ -431,6 +431,7 @@ export default function TankCanvas(props: Props) {
       detectMove('p1', P.p1x);
       detectMove('p2', P.p2x);
 
+      // ===== DRAW TANKS =====
       const drawTank = (
         px: number, angle: number, hp: number, slot: PlayerSlot,
         bodyImg: HTMLImageElement | null, turretImg: HTMLImageElement | null,
@@ -439,19 +440,12 @@ export default function TankCanvas(props: Props) {
         const facingLeft = slot === 'player2';
         const anim = ta[slot === 'player1' ? 'p1' : 'p2'];
 
-        // Terrain slope — sample terrain ~20px on each side for a smooth tilt
         const slopeSpan = 20;
         const leftY = getTY(Math.max(0, px - slopeSpan));
         const rightY = getTY(Math.min(W - 1, px + slopeSpan));
         const slopeAngle = Math.atan2(rightY - leftY, slopeSpan * 2);
-
-        // Idle bob — subtle floating motion
         const idleBob = Math.sin(now * 1.5 + (slot === 'player1' ? 0 : Math.PI)) * 1.2;
-
-        // Recoil offset (slides back on fire, springs back)
         const recoilX = anim.recoil * (facingLeft ? 5 : -5);
-
-        // Hit rock (tilts on damage)
         const hitTilt = Math.sin(anim.hitRock * 8) * anim.hitRock * .15 * anim.hitDir;
 
         // Movement exhaust smoke
@@ -482,7 +476,6 @@ export default function TankCanvas(props: Props) {
           flashGrad.addColorStop(1, 'rgba(255,100,0,0)');
           ctx.fillStyle = flashGrad;
           ctx.beginPath(); ctx.arc(flashX, flashY, 14, 0, Math.PI * 2); ctx.fill();
-          // Bright core
           ctx.fillStyle = '#fff';
           ctx.beginPath(); ctx.arc(flashX, flashY, 4, 0, Math.PI * 2); ctx.fill();
           ctx.restore();
@@ -494,56 +487,35 @@ export default function TankCanvas(props: Props) {
         if (facingLeft) ctx.scale(-1, 1);
 
         if (bodyImg && turretImg) {
-          // PNG tank — body + rotating barrel
-          const scale = 55 / bodyImg.width; // smaller tanks — further away look
+          const scale = 55 / bodyImg.width;
           const bw = bodyImg.width * scale, bh = bodyImg.height * scale;
-
-          // Barrel: keep original aspect ratio, scale by same factor
           const barrelScale = scale;
           const brlW = turretImg.width * barrelScale;
           const brlH = turretImg.height * barrelScale;
 
-          // Body — sit on top of terrain
           ctx.drawImage(bodyImg, -bw / 2, -bh, bw, bh);
 
-          // Barrel — pivot at the right edge of turret dome where barrel exits
-          // This is roughly at x = bw * 0.15 from center, y = top of turret area
           ctx.save();
-          ctx.translate(bw * .15, -bh * .66); // barrel mount point at turret edge
-          // In the flipped coordinate system (player 2), we need to mirror the angle
-          // so the barrel direction matches the trajectory direction
+          ctx.translate(bw * .15, -bh * .66);
           const effectiveAngle = facingLeft ? (180 - angle) : angle;
           const elevationRad = -(effectiveAngle * Math.PI / 180);
           ctx.rotate(elevationRad);
-          // Draw barrel starting from pivot, extending right
-          // The left edge of the barrel image = the pivot point
           ctx.drawImage(turretImg, 0, -brlH / 2, brlW, brlH);
           ctx.restore();
-
         } else {
-          // Fallback procedural tank
           const tankW = 30, tankH = 15;
-
-          // Tracks
           ctx.fillStyle = '#1a1a1a';
           ctx.fillRect(-tankW / 2, -10, tankW, 10);
-          // Wheels — animate rotation when moving
           ctx.fillStyle = '#444';
           for (let i = -2; i <= 2; i++) {
-            ctx.beginPath();
-            ctx.arc(i * 6, -5, 3, 0, Math.PI * 2);
-            ctx.fill();
-            // Wheel spoke
-            ctx.strokeStyle = '#555';
-            ctx.lineWidth = .6;
+            ctx.beginPath(); ctx.arc(i * 6, -5, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#555'; ctx.lineWidth = .6;
             const wheelAngle = now * (anim.moving ? 12 : 0) + i;
             ctx.beginPath();
             ctx.moveTo(i * 6 + Math.cos(wheelAngle) * 2, -5 + Math.sin(wheelAngle) * 2);
             ctx.lineTo(i * 6 - Math.cos(wheelAngle) * 2, -5 - Math.sin(wheelAngle) * 2);
             ctx.stroke();
           }
-
-          // Hull
           const c1 = slot === 'player1' ? '#6b7a3a' : '#8b3a3a';
           const c2 = slot === 'player1' ? '#4a5528' : '#5c2222';
           ctx.fillStyle = c1;
@@ -552,29 +524,18 @@ export default function TankCanvas(props: Props) {
           ctx.lineTo(tankW / 2 - 2, -4);
           ctx.lineTo(tankW / 2 - 6, -tankH + 6);
           ctx.lineTo(-tankW / 2 + 8, -tankH + 6);
-          ctx.closePath();
-          ctx.fill();
-
-          // Turret dome
+          ctx.closePath(); ctx.fill();
           ctx.fillStyle = c2;
-          ctx.beginPath();
-          ctx.arc(0, -tankH + 3, 8, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Barrel (rotates)
+          ctx.beginPath(); ctx.arc(0, -tankH + 3, 8, 0, Math.PI * 2); ctx.fill();
           ctx.save();
           ctx.translate(0, -tankH + 3);
           const fallbackEffAngle = facingLeft ? (180 - angle) : angle;
-          const barrelAngle = -(fallbackEffAngle * Math.PI / 180);
-          ctx.rotate(barrelAngle);
-          ctx.fillStyle = '#666';
-          ctx.fillRect(0, -1.8, 24, 3.5);
-          ctx.fillStyle = '#555';
-          ctx.fillRect(22, -2.5, 4, 5);
+          ctx.rotate(-(fallbackEffAngle * Math.PI / 180));
+          ctx.fillStyle = '#666'; ctx.fillRect(0, -1.8, 24, 3.5);
+          ctx.fillStyle = '#555'; ctx.fillRect(22, -2.5, 4, 5);
           ctx.restore();
         }
 
-        // HP low — red pulse overlay
         if (hp < 30) {
           ctx.globalAlpha = .15 + Math.sin(now * 6) * .1;
           ctx.fillStyle = '#ff0000';
@@ -583,15 +544,10 @@ export default function TankCanvas(props: Props) {
         }
 
         ctx.restore();
-
-        // Decay animations
-        anim.recoil *= .85;
-        anim.hitRock *= .92;
-        anim.muzzleFlash *= .88;
-        anim.moveSmoke *= .95;
+        anim.recoil *= .85; anim.hitRock *= .92;
+        anim.muzzleFlash *= .88; anim.moveSmoke *= .95;
       };
 
-      // Use tank1 assets for both (they're identical) — prevents loading race where one fails
       const tBody = A?.tank1Body ?? A?.tank2Body ?? null;
       const tTurret = A?.tank1Turret ?? A?.tank2Turret ?? null;
       drawTank(P.p1x, P.p1Angle, P.p1Hp, 'player1', tBody, tTurret);
