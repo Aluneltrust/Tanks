@@ -6,11 +6,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PrivateKey } from '@bsv/sdk';
 import { STAKE_TIERS, STORAGE_KEYS, BSV_NETWORK } from './constants';
 import { useMultiplayer } from './hooks/useMultiplayer';
-import { bsvWalletService, bsvPriceService, fetchBalance } from './services';
+import { bsvWalletService, bsvPriceService, fetchBalance, isEmbedded, bridgeGetAddress, bridgeGetBalance, bridgeSignTransaction } from './services';
 import { hasStoredWallet, getAddressHint, encryptAndStoreWif, decryptStoredWif, deleteStoredWallet } from './services/pinCrypto';
-import TankCanvas from './components/TankCanvas';
+import TankCanvas from './components/three/TankScene';
 import TerrainDrawer from './components/TerrainDrawer';
+import WalletPage from './components/WalletPage';
 import { audioManager } from './components/AudioManager';
+import './styles/WalletStyles.css';
 
 export default function App() {
   // Wallet state
@@ -19,6 +21,7 @@ export default function App() {
   const [balance, setBalance] = useState(0);
   const [username, setUsername] = useState(localStorage.getItem(STORAGE_KEYS.USERNAME) || '');
   const [bsvPrice, setBsvPrice] = useState(50);
+  const [embeddedMode] = useState(() => isEmbedded());
 
   // Login state
   const [pin, setPin] = useState('');
@@ -27,6 +30,9 @@ export default function App() {
   );
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+
+  // Wallet page state
+  const [showWallet, setShowWallet] = useState(false);
 
   // Game state
   const [selectedTier, setSelectedTier] = useState(1);
@@ -37,8 +43,26 @@ export default function App() {
 
   const mp = useMultiplayer();
 
-  // Connect socket on mount
-  useEffect(() => { mp.connect(); }, []);
+  // Connect socket on mount + bridge init if embedded
+  useEffect(() => {
+    mp.connect();
+    if (embeddedMode) {
+      (async () => {
+        try {
+          const address = await bridgeGetAddress();
+          const bal = await bridgeGetBalance();
+          const savedName = localStorage.getItem(STORAGE_KEYS.USERNAME) || 'Player';
+          setUsername(savedName);
+          setWalletAddress(address);
+          setBalance(bal);
+          // Set a dummy key so the login screen is skipped
+          setWalletKey(PrivateKey.fromRandom());
+        } catch (e) {
+          console.error('Bridge wallet init failed:', e);
+        }
+      })();
+    }
+  }, []);
 
   // Fetch price
   useEffect(() => {
@@ -50,7 +74,9 @@ export default function App() {
   // Refresh balance periodically
   useEffect(() => {
     if (!walletAddress) return;
-    const refresh = () => fetchBalance(walletAddress).then(setBalance);
+    const refresh = embeddedMode
+      ? () => bridgeGetBalance().then(setBalance).catch(() => {})
+      : () => fetchBalance(walletAddress).then(setBalance);
     refresh();
     const iv = setInterval(refresh, 15000);
     return () => clearInterval(iv);
@@ -190,10 +216,20 @@ export default function App() {
     if (!walletKey || !mp.escrowAddress || !mp.depositSats) return;
     setWagerLoading(true);
     try {
-      bsvWalletService.connect(walletKey.toWif());
-      const result = await bsvWalletService.sendGamePayment(
-        mp.escrowAddress, mp.depositSats, mp.gameId, 'wager',
-      );
+      let result: { success: boolean; rawTxHex?: string; error?: string };
+
+      if (embeddedMode) {
+        result = await bridgeSignTransaction(
+          mp.escrowAddress, mp.depositSats,
+          JSON.stringify({ app: 'BSVTANKS', action: 'WAGER', game: mp.gameId.substring(0, 8) }),
+        );
+      } else {
+        bsvWalletService.connect(walletKey.toWif());
+        result = await bsvWalletService.sendGamePayment(
+          mp.escrowAddress, mp.depositSats, mp.gameId, 'wager',
+        );
+      }
+
       if (result.success && result.rawTxHex) {
         mp.submitWager(result.rawTxHex);
       } else {
@@ -242,6 +278,36 @@ export default function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [mp.gamePhase, mp.animatingShot, mp.currentTurn, mp.mySlot, mp.p1x, mp.p2x, myAngle, myPower]);
+
+  // ============================================================================
+  // WALLET PAGE — refresh helper
+  // ============================================================================
+
+  const handleRefreshBalance = useCallback(() => {
+    if (!walletAddress) return;
+    if (embeddedMode) {
+      bridgeGetBalance().then(setBalance).catch(() => {});
+    } else {
+      fetchBalance(walletAddress).then(setBalance);
+    }
+  }, [walletAddress, embeddedMode]);
+
+  // ============================================================================
+  // RENDER — WALLET OVERLAY (before everything else so it covers all screens)
+  // ============================================================================
+
+  if (showWallet && walletKey) {
+    return (
+      <WalletPage
+        onBack={() => setShowWallet(false)}
+        walletAddress={walletAddress}
+        balance={balance}
+        bsvPrice={bsvPrice}
+        walletSource={embeddedMode ? 'embedded' : 'standalone'}
+        onRefreshBalance={handleRefreshBalance}
+      />
+    );
+  }
 
   // ============================================================================
   // RENDER — LOGIN SCREEN
@@ -307,6 +373,7 @@ export default function App() {
   if (mp.gamePhase === 'matchmaking') {
     return (
       <div className="matchmaking-screen">
+        <button className="wallet-topbar-btn wallet-btn-floating" onClick={() => setShowWallet(true)}>Wallet</button>
         <h2>Finding Opponent...</h2>
         <div className="spinner" />
         <div className="message-bar">{mp.message}</div>
@@ -323,6 +390,7 @@ export default function App() {
     const satsToUsd = (s: number) => `$${((s / 1e8) * bsvPrice).toFixed(4)}`;
     return (
       <div className="wager-screen">
+        <button className="wallet-topbar-btn wallet-btn-floating" onClick={() => setShowWallet(true)}>Wallet</button>
         <h2>Pay Deposit</h2>
         <div className="wager-info">
           <div>vs <strong>{mp.opponentName}</strong></div>
@@ -380,6 +448,7 @@ export default function App() {
   if (mp.gamePhase === 'drawing_terrain') {
     return (
       <div className="game-screen">
+        <button className="wallet-topbar-btn wallet-btn-floating" onClick={() => setShowWallet(true)}>Wallet</button>
         <TerrainDrawer mySlot={mp.mySlot} onSubmit={mp.submitTerrain} />
         {mp.message && (
           <div style={{
@@ -408,6 +477,7 @@ export default function App() {
 
     return (
       <div className="game-screen">
+        <button className="wallet-topbar-btn wallet-btn-floating" onClick={() => setShowWallet(true)}>Wallet</button>
         {/* Canvas — fills entire screen */}
         <TankCanvas
           terrain={mp.terrain}
@@ -545,6 +615,7 @@ export default function App() {
         <span>{username}</span>
         <span className="address">{walletAddress.slice(0, 12)}...</span>
         <span>{balance.toLocaleString()} sats</span>
+        <button className="wallet-topbar-btn wallet-btn-lobby" onClick={() => setShowWallet(true)}>Wallet</button>
       </div>
 
       {mp.message && <div className="message-bar">{mp.message}</div>}
