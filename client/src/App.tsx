@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PrivateKey } from '@bsv/sdk';
 import { STAKE_TIERS, STORAGE_KEYS, BSV_NETWORK } from './constants';
 import { useMultiplayer } from './hooks/useMultiplayer';
-import { bsvWalletService, bsvPriceService, fetchBalance, isEmbedded, bridgeGetAddress, bridgeGetBalance, bridgeSignTransaction } from './services';
+import { bsvWalletService, bsvPriceService, fetchBalance, isEmbedded, bridgeGetAddress, bridgeGetBalance, bridgeGetUsername, bridgeSignTransaction } from './services';
 import { hasStoredWallet, getAddressHint, encryptAndStoreWif, decryptStoredWif, deleteStoredWallet } from './services/pinCrypto';
 import TankCanvas from './components/three/TankScene';
 import TerrainDrawer from './components/TerrainDrawer';
@@ -50,11 +50,14 @@ export default function App() {
       (async () => {
         try {
           const address = await bridgeGetAddress();
-          const bal = await bridgeGetBalance();
-          const savedName = localStorage.getItem(STORAGE_KEYS.USERNAME) || 'Player';
-          setUsername(savedName);
           setWalletAddress(address);
+          const [bal, parentName] = await Promise.all([
+            bridgeGetBalance().catch(() => 0),
+            bridgeGetUsername().catch(() => ''),
+          ]);
           setBalance(bal);
+          const savedName = parentName || localStorage.getItem(STORAGE_KEYS.USERNAME) || 'Player';
+          setUsername(savedName);
           // Set a dummy key so the login screen is skipped
           setWalletKey(PrivateKey.fromRandom());
         } catch (e) {

@@ -11,6 +11,7 @@ export {
   decryptStoredWif,
   deleteStoredWallet,
 } from './pinCrypto';
+export { isEmbedded, bridgeGetAddress, bridgeGetBalance, bridgeGetUsername, bridgeSignTransaction } from './GameWalletBridge';
 
 import { BACKEND_URL, BSV_NETWORK } from '../constants';
 
