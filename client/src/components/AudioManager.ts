@@ -25,8 +25,8 @@ const SOUND_PATHS: Record<SoundName, string> = {
   victory: '/audio/victory.mp3',
   defeat: '/audio/defeat.mp3',
   engine_idle: '/audio/engine-idle.mp3',
-  music_lobby: '/audio/music-lobby.mp3',
-  music_battle: '/audio/music-battle.mp3',
+  music_lobby: '/audio/lobby-music.mp3',
+  music_battle: '/audio/battle-music.mp3',
 };
 
 // Target volume per sound (0–1), multiplied by masterVolume
@@ -53,7 +53,9 @@ class AudioManager {
   private buffers = new Map<SoundName, AudioBuffer>();
   private ctx: AudioContext | null = null;
   private masterVolume = 0.7;
+  private musicVolume = 0.3;
   private loaded = false;
+  private muted = false;
 
   // Named loops — supports multiple concurrent loops
   private loops = new Map<SoundName, LoopHandle>();
@@ -88,6 +90,7 @@ class AudioManager {
 
   /** Play a one-shot sound effect. */
   play(name: SoundName): void {
+    if (this.muted) return;
     if (!this.ensureResumed()) return;
     const buffer = this.buffers.get(name);
     if (!buffer) return;
@@ -103,6 +106,7 @@ class AudioManager {
 
   /** Start a named looping sound. Fades in over fadeIn seconds. */
   startLoop(name: SoundName, fadeIn = 0.4): void {
+    if (this.muted) return;
     if (!this.ensureResumed()) return;
     if (this.loops.has(name)) return; // already playing
 
@@ -114,7 +118,8 @@ class AudioManager {
     source.loop = true;
 
     const gain = this.ctx!.createGain();
-    const targetVol = this.masterVolume * SOUND_VOLUMES[name];
+    const isMusic = name === 'music_lobby' || name === 'music_battle';
+    const targetVol = isMusic ? this.musicVolume : this.masterVolume * SOUND_VOLUMES[name];
     gain.gain.setValueAtTime(0, this.ctx!.currentTime);
     gain.gain.linearRampToValueAtTime(targetVol, this.ctx!.currentTime + fadeIn);
 
@@ -163,6 +168,34 @@ class AudioManager {
         this.ctx.currentTime,
       );
     }
+  }
+
+  toggleMute(): boolean {
+    this.muted = !this.muted;
+    if (this.muted) {
+      this.stopAllLoops(0.3);
+    }
+    return this.muted;
+  }
+
+  isMuted(): boolean {
+    return this.muted;
+  }
+
+  setMusicVolume(vol: number): void {
+    this.musicVolume = Math.max(0, Math.min(0.4, vol));
+    if (!this.ctx) return;
+    // Update any currently playing music loops
+    for (const name of ['music_lobby', 'music_battle'] as SoundName[]) {
+      const handle = this.loops.get(name);
+      if (handle) {
+        handle.gain.gain.setValueAtTime(this.musicVolume, this.ctx.currentTime);
+      }
+    }
+  }
+
+  getMusicVolume(): number {
+    return this.musicVolume;
   }
 }
 

@@ -517,6 +517,77 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--text-mute
 }
 .game-actions button:hover { border-color: var(--text-dim); color: var(--text); }
 
+/* --- Wallet button inside controls bar --- */
+.controls-wallet-btn {
+  font-family: var(--font-display);
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-dim);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.controls-wallet-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 10px var(--gold-glow);
+}
+
+/* --- Sound controls inside controls bar --- */
+.controls-sound {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.controls-mute-btn {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0; flex-shrink: 0;
+}
+.controls-mute-btn:hover {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--gold);
+  transform: scale(1.1);
+}
+.controls-mute-btn:active { transform: scale(0.95); }
+.controls-mute-btn.muted { color: #64748b; opacity: 0.5; }
+
+.controls-volume-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 60px; height: 3px;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.15);
+  outline: none; cursor: pointer;
+}
+.controls-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--gold);
+  cursor: pointer;
+  border: 1.5px solid rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 6px var(--gold-glow);
+  transition: all 0.15s;
+}
+.controls-volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: #f59e0b;
+}
+.controls-mute-btn.muted ~ .controls-volume-slider {
+  opacity: 0.25; pointer-events: none;
+}
+
 /* --- Message floating above controls --- */
 .game-message {
   position: absolute;
@@ -531,7 +602,7 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--text-mute
 /* --- Keyboard hints --- */
 .key-hints {
   position: absolute;
-  bottom: calc(84px + 1rem + 20px); right: 20px;
+  bottom: calc(84px + 1rem + 1rem + 20px); left: 50%; transform: translateX(-50%);
   display: flex; gap: 10px;
   z-index: 10; pointer-events: none;
 }
@@ -570,3 +641,123 @@ kbd {
 .game-over-overlay h1.lose { color: var(--p2); text-shadow: 0 0 30px var(--p2-glow); }
 .game-over-overlay h1.draw { color: var(--text-dim); }
 .game-over-overlay .result-message { font-size: 16px; color: var(--text-dim); font-weight: 600; }
+
+/* ============================================
+   SOUND CONTROLS — Mute button + volume slider
+   Fixed bottom-right corner
+   ============================================ */
+
+.sound-controls {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 2rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.35rem;
+  transition: all 0.3s ease;
+}
+.sound-controls:hover {
+  background: rgba(0, 0, 0, 0.75);
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.sound-mute-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.sound-mute-btn:hover {
+  background: rgba(251, 191, 36, 0.15);
+  transform: scale(1.1);
+}
+.sound-mute-btn:active {
+  transform: scale(0.95);
+}
+.sound-mute-btn.muted {
+  color: #64748b;
+  opacity: 0.6;
+}
+
+.sound-volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 80px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.2);
+  outline: none;
+  cursor: pointer;
+  transition: width 0.3s ease;
+}
+.sound-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fbbf24;
+  cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: all 0.15s;
+}
+.sound-volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: #f59e0b;
+}
+.sound-volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fbbf24;
+  cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.sound-controls.muted .sound-volume-slider {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .sound-controls {
+    bottom: 0.75rem;
+    right: 0.75rem;
+    padding: 0.25rem 0.4rem 0.25rem 0.25rem;
+    gap: 0.4rem;
+  }
+  .sound-mute-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+  .sound-volume-slider {
+    width: 60px;
+  }
+}
+@media (max-width: 400px) {
+  .sound-controls {
+    bottom: 0.5rem;
+    right: 0.5rem;
+  }
+  .sound-volume-slider {
+    width: 50px;
+  }
+}

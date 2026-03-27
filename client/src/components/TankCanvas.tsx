@@ -6,7 +6,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import {
   GRAVITY, TANK_HEIGHT, BARREL_LENGTH, EXPLOSION_RADIUS,
-  CANVAS_WIDTH, CANVAS_HEIGHT,
+  CANVAS_WIDTH, CANVAS_HEIGHT, WALL_CENTER, WALL_WIDTH, WALL_HEIGHT,
 } from '../constants';
 import type { ShotResultData, PlayerSlot } from '../hooks/useMultiplayer';
 import { loadGameAssets, type GameAssets } from './AssetLoader';
@@ -41,6 +41,11 @@ export default function TankCanvas(props: Props) {
   const starsRef = useRef<{ x: number; y: number; s: number; t: number }[]>([]);
   const treeSpikeRef = useRef<number[]>([]);
   const terrainCacheRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Barrel tip world positions + angle — written by drawTank, read by aim guide
+  const barrelTipRef = useRef<{ p1: { x: number; y: number; angle: number }; p2: { x: number; y: number; angle: number } }>({
+    p1: { x: 0, y: 0, angle: 0 }, p2: { x: 0, y: 0, angle: 0 },
+  });
 
   // Tank animation states
   const tankAnimRef = useRef({
@@ -79,12 +84,14 @@ export default function TankCanvas(props: Props) {
     if (!canvas) return;
 
     const W = CANVAS_WIDTH, H = CANVAS_HEIGHT;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
 
     canvas.width = W * dpr;
     canvas.height = H * dpr;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d', { alpha: false })!;
     ctx.scale(dpr, dpr);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     // Terrain cache
     if (!terrainCacheRef.current) {
@@ -117,76 +124,166 @@ export default function TankCanvas(props: Props) {
     // ===== FALLBACK DRAWING FUNCTIONS =====
 
     const drawFallbackSky = () => {
+      // Rich twilight gradient
       const g = ctx.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, '#0a0e20');
-      g.addColorStop(.35, '#1a1e3a');
-      g.addColorStop(.55, '#2a2844');
-      g.addColorStop(.72, '#4a3848');
-      g.addColorStop(.85, '#8a5540');
-      g.addColorStop(.93, '#cc8855');
-      g.addColorStop(1, '#eebb77');
+      g.addColorStop(0, '#050816');
+      g.addColorStop(.15, '#0c1230');
+      g.addColorStop(.30, '#1a1e48');
+      g.addColorStop(.45, '#2e2650');
+      g.addColorStop(.58, '#4a3050');
+      g.addColorStop(.70, '#7a3840');
+      g.addColorStop(.80, '#b85535');
+      g.addColorStop(.88, '#dd8844');
+      g.addColorStop(.94, '#eebb66');
+      g.addColorStop(1, '#f5dd88');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, H);
 
-      // Sun
-      ctx.globalAlpha = .25;
-      ctx.fillStyle = '#ffdd88';
-      ctx.beginPath(); ctx.arc(W * .75, H * .42, 30, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = .06;
-      ctx.beginPath(); ctx.arc(W * .75, H * .42, 70, 0, Math.PI * 2); ctx.fill();
+      // Atmospheric haze layer
+      const haze = ctx.createRadialGradient(W * .7, H * .5, 0, W * .7, H * .5, W * .5);
+      haze.addColorStop(0, 'rgba(255,180,100,0.08)');
+      haze.addColorStop(.5, 'rgba(200,120,80,0.04)');
+      haze.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = haze;
+      ctx.fillRect(0, 0, W, H);
+
+      // Sun with crisp glow rings
+      const sunX = W * .72, sunY = H * .40;
+      // Outer glow
+      ctx.globalAlpha = .04;
+      const sunOuter = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 120);
+      sunOuter.addColorStop(0, '#ffee88');
+      sunOuter.addColorStop(.5, '#ffaa44');
+      sunOuter.addColorStop(1, 'rgba(255,150,50,0)');
+      ctx.fillStyle = sunOuter;
+      ctx.beginPath(); ctx.arc(sunX, sunY, 120, 0, Math.PI * 2); ctx.fill();
+      // Mid glow
+      ctx.globalAlpha = .12;
+      const sunMid = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 50);
+      sunMid.addColorStop(0, '#fff8e0');
+      sunMid.addColorStop(.4, '#ffdd88');
+      sunMid.addColorStop(1, 'rgba(255,180,60,0)');
+      ctx.fillStyle = sunMid;
+      ctx.beginPath(); ctx.arc(sunX, sunY, 50, 0, Math.PI * 2); ctx.fill();
+      // Core
+      ctx.globalAlpha = .3;
+      ctx.fillStyle = '#ffee99';
+      ctx.beginPath(); ctx.arc(sunX, sunY, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = .5;
+      ctx.fillStyle = '#fff8dd';
+      ctx.beginPath(); ctx.arc(sunX, sunY, 10, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
 
-      // Stars
+      // Stars with sharper rendering
       const now = Date.now() / 1000;
       for (const st of starsRef.current) {
-        const a = .15 + .25 * Math.sin(now * .8 + st.t);
-        ctx.fillStyle = `rgba(220,225,255,${a})`;
-        ctx.beginPath(); ctx.arc(st.x, st.y, st.s, 0, Math.PI * 2); ctx.fill();
+        const a = .2 + .35 * Math.sin(now * .8 + st.t);
+        ctx.globalAlpha = a;
+        // Sharp core
+        ctx.fillStyle = '#e8ecff';
+        ctx.beginPath(); ctx.arc(st.x, st.y, st.s * .5, 0, Math.PI * 2); ctx.fill();
+        // Soft glow
+        ctx.globalAlpha = a * .3;
+        ctx.fillStyle = '#c0c8ff';
+        ctx.beginPath(); ctx.arc(st.x, st.y, st.s * 1.5, 0, Math.PI * 2); ctx.fill();
       }
+      ctx.globalAlpha = 1;
+
+      // Subtle cloud wisps
+      ctx.globalAlpha = .03;
+      for (let i = 0; i < 5; i++) {
+        const cx = W * (.1 + i * .2), cy = H * (.3 + Math.sin(i * 1.7) * .08);
+        const cw = 100 + i * 30, ch = 15 + i * 5;
+        const cloudG = ctx.createRadialGradient(cx, cy, 0, cx, cy, cw);
+        cloudG.addColorStop(0, '#ffddbb');
+        cloudG.addColorStop(1, 'rgba(255,200,150,0)');
+        ctx.fillStyle = cloudG;
+        ctx.beginPath(); ctx.ellipse(cx, cy, cw, ch, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     };
 
     const drawFallbackMountains = () => {
-      // Far mountains — dark, tall
-      ctx.fillStyle = '#0e1220';
+      // Far mountains — dark, tall, with snow caps
+      ctx.fillStyle = '#0a0e1a';
       ctx.beginPath(); ctx.moveTo(0, H * .52);
-      for (let i = 0; i <= 40; i++) {
-        const x = (i / 40) * W;
-        const y = H * .38 - Math.sin(i * .8) * 35 - Math.sin(i * 2.1) * 18 - Math.abs(Math.sin(i * 1.5)) * 25;
+      const farPeaks: { x: number; y: number }[] = [];
+      for (let i = 0; i <= 80; i++) {
+        const x = (i / 80) * W;
+        const y = H * .36 - Math.sin(i * .4) * 40 - Math.sin(i * 1.1) * 22 - Math.abs(Math.sin(i * .75)) * 30;
+        farPeaks.push({ x, y });
         ctx.lineTo(x, y);
       }
       ctx.lineTo(W, H * .52); ctx.fill();
+      // Snow highlights on far peaks
+      ctx.globalAlpha = .08;
+      ctx.strokeStyle = '#8899bb';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const p of farPeaks) { if (p.y < H * .3) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
 
-      // Mid mountains
-      ctx.fillStyle = '#1a2030';
-      ctx.beginPath(); ctx.moveTo(0, H * .52);
-      for (let i = 0; i <= 40; i++) {
-        const x = (i / 40) * W;
-        const y = H * .42 - Math.sin(i * .6 + 1) * 28 - Math.sin(i * 1.8 + 2) * 14;
-        ctx.lineTo(x, y);
-      }
-      ctx.lineTo(W, H * .52); ctx.fill();
-
-      // Near hills
-      ctx.fillStyle = '#1a2a1a';
-      ctx.beginPath(); ctx.moveTo(0, H * .52);
-      for (let i = 0; i <= 50; i++) {
-        const x = (i / 50) * W;
-        const y = H * .46 - Math.sin(i * .5 + 3) * 15 - Math.sin(i * 1.2) * 8;
-        ctx.lineTo(x, y);
-      }
-      ctx.lineTo(W, H * .52); ctx.fill();
-
-      // Tree line
-      ctx.fillStyle = '#0d1a0d';
+      // Mid mountains with subtle gradient
+      const midG = ctx.createLinearGradient(0, H * .3, 0, H * .52);
+      midG.addColorStop(0, '#151c30');
+      midG.addColorStop(1, '#1a2235');
+      ctx.fillStyle = midG;
       ctx.beginPath(); ctx.moveTo(0, H * .52);
       for (let i = 0; i <= 60; i++) {
         const x = (i / 60) * W;
-        const base = H * .49;
-        // Spiky tree shapes
-        const spike = treeSpikeRef.current[i] ?? -2;
-        ctx.lineTo(x, base + spike - Math.sin(i * .4) * 5);
+        const y = H * .40 - Math.sin(i * .35 + 1) * 32 - Math.sin(i * .9 + 2) * 16;
+        ctx.lineTo(x, y);
       }
       ctx.lineTo(W, H * .52); ctx.fill();
+      // Ridge highlight
+      ctx.globalAlpha = .06;
+      ctx.strokeStyle = '#667799';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, H * .52);
+      for (let i = 0; i <= 60; i++) {
+        const x = (i / 60) * W;
+        const y = H * .40 - Math.sin(i * .35 + 1) * 32 - Math.sin(i * .9 + 2) * 16;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Near hills — green-tinted
+      const nearG = ctx.createLinearGradient(0, H * .4, 0, H * .52);
+      nearG.addColorStop(0, '#152518');
+      nearG.addColorStop(1, '#1a2a1a');
+      ctx.fillStyle = nearG;
+      ctx.beginPath(); ctx.moveTo(0, H * .52);
+      for (let i = 0; i <= 80; i++) {
+        const x = (i / 80) * W;
+        const y = H * .45 - Math.sin(i * .3 + 3) * 18 - Math.sin(i * .7) * 10;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W, H * .52); ctx.fill();
+
+      // Tree line with detailed silhouettes
+      ctx.fillStyle = '#0a150a';
+      ctx.beginPath(); ctx.moveTo(0, H * .52);
+      for (let i = 0; i <= 120; i++) {
+        const x = (i / 120) * W;
+        const base = H * .488;
+        // Varied tree shapes — tall pines and rounded deciduous
+        const spike = (i % 5 === 0) ? -10 - Math.random() * 8 :
+                      (i % 3 === 0) ? -6 - Math.random() * 4 : -1.5;
+        ctx.lineTo(x, base + spike - Math.sin(i * .25) * 5);
+      }
+      ctx.lineTo(W, H * .52); ctx.fill();
+
+      // Fog/haze at mountain base
+      ctx.globalAlpha = .06;
+      const fogG = ctx.createLinearGradient(0, H * .46, 0, H * .54);
+      fogG.addColorStop(0, 'rgba(150,160,180,0)');
+      fogG.addColorStop(.5, 'rgba(150,160,180,1)');
+      fogG.addColorStop(1, 'rgba(150,160,180,0)');
+      ctx.fillStyle = fogG;
+      ctx.fillRect(0, H * .46, W, H * .08);
+      ctx.globalAlpha = 1;
     };
 
     // ===== TERRAIN CACHE =====
@@ -207,74 +304,118 @@ export default function TankCanvas(props: Props) {
       tc.closePath();
       tc.clip();
 
-      // Gradient fill
+      // Rich terrain gradient with multiple soil layers
       let minY = H;
       for (let i = 0; i < t.length; i++) if (t[i] < minY) minY = t[i];
 
       const g = tc.createLinearGradient(0, minY - 5, 0, H + 5);
-      g.addColorStop(0, '#4a8535');
-      g.addColorStop(.04, '#3d7028');
-      g.addColorStop(.08, '#6b5030');
-      g.addColorStop(.2, '#7d5a35');
-      g.addColorStop(.35, '#8a6540');
-      g.addColorStop(.55, '#6a4a2a');
-      g.addColorStop(.75, '#4a3018');
-      g.addColorStop(1, '#352210');
+      g.addColorStop(0, '#4a9030');     // Bright grass top
+      g.addColorStop(.02, '#3d7a25');   // Grass to topsoil
+      g.addColorStop(.06, '#5a6a30');   // Topsoil transition
+      g.addColorStop(.10, '#6b5030');   // Rich brown soil
+      g.addColorStop(.18, '#7d5a35');   // Mid soil
+      g.addColorStop(.30, '#8a6540');   // Clay layer
+      g.addColorStop(.45, '#7a5530');   // Deep soil
+      g.addColorStop(.60, '#5a3a1e');   // Subsoil
+      g.addColorStop(.80, '#3a2212');   // Deep earth
+      g.addColorStop(1, '#221408');     // Bedrock dark
       tc.fillStyle = g;
       tc.fillRect(0, 0, W, H + 5);
 
-      // Strata
-      tc.globalAlpha = .06;
-      for (let y = minY + 30; y < H; y += 18) {
-        tc.strokeStyle = '#000';
-        tc.lineWidth = .8;
+      // Rock/strata lines with variation
+      for (let y = minY + 20; y < H; y += 12) {
+        tc.globalAlpha = .04 + Math.sin(y * .02) * .02;
+        tc.strokeStyle = y > minY + 80 ? '#1a1008' : '#000';
+        tc.lineWidth = .6 + Math.sin(y * .03) * .3;
         tc.beginPath();
-        tc.moveTo(0, y + Math.sin(y * .04) * 3);
-        tc.lineTo(W, y + Math.sin(y * .04 + 2) * 3);
+        for (let x = 0; x < W; x += 3) {
+          tc.lineTo(x, y + Math.sin(x * .01 + y * .04) * 3 + Math.sin(x * .03) * 1.5);
+        }
         tc.stroke();
+      }
+
+      // Scattered rocks/pebbles in soil
+      tc.globalAlpha = .05;
+      for (let i = 0; i < 60; i++) {
+        const rx = Math.random() * W;
+        const ry = minY + 15 + Math.random() * (H - minY - 15);
+        if (ry < t[Math.round(rx)] || true) {
+          tc.fillStyle = Math.random() > .5 ? '#8a7a6a' : '#5a4a3a';
+          tc.beginPath();
+          tc.ellipse(rx, ry, 1.5 + Math.random() * 3, 1 + Math.random() * 2, Math.random() * Math.PI, 0, Math.PI * 2);
+          tc.fill();
+        }
       }
       tc.globalAlpha = 1;
       tc.restore();
 
-      // Grass edge
-      tc.lineWidth = 3;
-      tc.strokeStyle = '#6acc4e';
+      // Rich grass edge — multi-layer for crisp look
+      // Shadow under grass
+      tc.lineWidth = 4;
+      tc.strokeStyle = 'rgba(20,40,10,0.5)';
+      tc.beginPath();
+      for (let x = 0; x < t.length; x++) tc.lineTo(x, t[x] + 2);
+      tc.stroke();
+
+      // Main grass body
+      tc.lineWidth = 3.5;
+      tc.strokeStyle = '#55bb38';
       tc.beginPath();
       for (let x = 0; x < t.length; x++) tc.lineTo(x, t[x]);
       tc.stroke();
 
-      // Highlight
-      tc.lineWidth = 1.2;
-      tc.strokeStyle = '#8aee68';
+      // Bright highlight on top
+      tc.lineWidth = 1.5;
+      tc.strokeStyle = '#88ee55';
       tc.beginPath();
-      for (let x = 0; x < t.length; x++) tc.lineTo(x, t[x] - .8);
+      for (let x = 0; x < t.length; x++) tc.lineTo(x, t[x] - .5);
       tc.stroke();
 
-      // Dark edge
-      tc.lineWidth = 1.5;
-      tc.strokeStyle = 'rgba(0,0,0,.12)';
+      // Sharp specular highlight
+      tc.lineWidth = .6;
+      tc.strokeStyle = 'rgba(180,255,120,0.5)';
       tc.beginPath();
-      for (let x = 0; x < t.length; x++) tc.lineTo(x, t[x] + 1.5);
+      for (let x = 0; x < t.length; x++) tc.lineTo(x, t[x] - 1.2);
       tc.stroke();
+
+      // Grass tufts along the edge
+      tc.fillStyle = '#55bb38';
+      for (let x = 0; x < t.length; x += 4) {
+        const h = 2 + Math.sin(x * .3) * 1.5 + Math.sin(x * .7) * 1;
+        tc.globalAlpha = .4;
+        tc.beginPath();
+        tc.moveTo(x - 1.5, t[x]);
+        tc.lineTo(x, t[x] - h);
+        tc.lineTo(x + 1.5, t[x]);
+        tc.fill();
+      }
+      tc.globalAlpha = 1;
 
       lastBuiltRef.current = terrainVerRef.current;
     };
 
     // ===== PARTICLES =====
     const emitBoom = (px: number, py: number, big: boolean) => {
-      const n = big ? 55 : 25, sc = big ? 1.2 : .7;
+      const n = big ? 80 : 35, sc = big ? 1.3 : .8;
       for (let i = 0; i < n; i++) {
-        const a = Math.random() * Math.PI * 2, v = (.5 + Math.random() * 3) * sc;
+        const a = Math.random() * Math.PI * 2, v = (.5 + Math.random() * 3.5) * sc;
         const r = Math.random();
-        const kind: Pt['kind'] = r < .3 ? 'fire' : r < .6 ? 'smoke' : r < .8 ? 'ember' : 'dirt';
+        const kind: Pt['kind'] = r < .28 ? 'fire' : r < .52 ? 'smoke' : r < .78 ? 'ember' : 'dirt';
         particlesRef.current.push({
-          x: px, y: py,
-          vx: Math.cos(a) * v * (kind === 'smoke' ? .2 : 1),
-          vy: kind === 'smoke' ? -(1 + Math.random() * 2) : -Math.abs(Math.sin(a) * v) - 1,
+          x: px + (Math.random() - .5) * 6, y: py + (Math.random() - .5) * 4,
+          vx: Math.cos(a) * v * (kind === 'smoke' ? .25 : 1),
+          vy: kind === 'smoke' ? -(1.5 + Math.random() * 2.5) : -Math.abs(Math.sin(a) * v) - 1.5,
           life: 1,
-          decay: kind === 'smoke' ? .004 : kind === 'fire' ? .018 : .02,
-          size: kind === 'smoke' ? 8 * sc : kind === 'fire' ? 5 * sc : 2.5,
+          decay: kind === 'smoke' ? .003 : kind === 'fire' ? .015 : kind === 'ember' ? .018 : .022,
+          size: kind === 'smoke' ? 10 * sc : kind === 'fire' ? 6 * sc : kind === 'ember' ? 2 : 3,
           kind,
+        });
+      }
+      // Extra bright flash at center
+      for (let i = 0; i < (big ? 6 : 3); i++) {
+        particlesRef.current.push({
+          x: px, y: py, vx: (Math.random() - .5) * .5, vy: -(Math.random() * .5),
+          life: 1, decay: .06, size: (big ? 14 : 8) * (1 - i * .15), kind: 'fire',
         });
       }
     };
@@ -294,27 +435,51 @@ export default function TankCanvas(props: Props) {
         const p = parts[i];
         p.life -= p.decay;
         if (p.life <= 0) { parts.splice(i, 1); continue; }
-        p.vy += p.kind === 'smoke' ? -.015 : .1;
+        p.vy += p.kind === 'smoke' ? -.018 : .1;
         p.vx *= .99;
         p.x += p.vx; p.y += p.vy;
-        if (p.kind === 'smoke') p.size += .12;
+        if (p.kind === 'smoke') p.size += .15;
       }
       for (const p of parts) {
-        ctx.globalAlpha = p.life * (p.kind === 'smoke' ? .22 : .85);
         const r = Math.max(.5, p.size * (p.kind === 'smoke' ? 1 : p.life));
         if (p.kind === 'fire') {
+          // Rich fire with radial gradient — hot core to dark edge
+          ctx.globalAlpha = p.life * .9;
           const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-          g.addColorStop(0, `rgba(255,${200 + p.life * 55 | 0},${50 * p.life | 0},1)`);
-          g.addColorStop(1, `rgba(255,${100 * p.life | 0},0,0)`);
+          const intensity = p.life;
+          g.addColorStop(0, `rgba(255,${220 + intensity * 35 | 0},${120 * intensity | 0},1)`);
+          g.addColorStop(.3, `rgba(255,${160 * intensity | 0},${20 * intensity | 0},1)`);
+          g.addColorStop(.7, `rgba(200,${60 * intensity | 0},0,.6)`);
+          g.addColorStop(1, `rgba(100,${20 * intensity | 0},0,0)`);
           ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+          // Additive glow
+          if (p.life > .5) {
+            ctx.globalAlpha = (p.life - .5) * .3;
+            ctx.fillStyle = '#fff8dd';
+            ctx.beginPath(); ctx.arc(p.x, p.y, r * .3, 0, Math.PI * 2); ctx.fill();
+          }
         } else if (p.kind === 'smoke') {
-          ctx.fillStyle = `rgb(${60 + p.life * 30 | 0},${58 + p.life * 25 | 0},${55 + p.life * 20 | 0})`;
+          ctx.globalAlpha = p.life * .25;
+          const smokeG = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+          smokeG.addColorStop(0, `rgba(${70 + p.life * 40 | 0},${65 + p.life * 35 | 0},${60 + p.life * 30 | 0},.8)`);
+          smokeG.addColorStop(1, `rgba(${50 + p.life * 20 | 0},${48 + p.life * 18 | 0},${45 + p.life * 15 | 0},0)`);
+          ctx.fillStyle = smokeG;
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
         } else if (p.kind === 'ember') {
-          ctx.fillStyle = `rgb(255,${180 * p.life | 0},0)`;
+          ctx.globalAlpha = p.life * .9;
+          ctx.fillStyle = `rgb(255,${200 * p.life | 0},${40 * p.life | 0})`;
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+          // Ember glow
+          ctx.globalAlpha = p.life * .3;
+          ctx.fillStyle = '#ffaa00';
+          ctx.beginPath(); ctx.arc(p.x, p.y, r * 2, 0, Math.PI * 2); ctx.fill();
         } else {
-          ctx.fillStyle = '#6b5a48';
+          // Dirt chunks
+          ctx.globalAlpha = p.life * .7;
+          ctx.fillStyle = `rgb(${90 + Math.random() * 20 | 0},${70 + Math.random() * 15 | 0},${50 + Math.random() * 10 | 0})`;
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
         }
-        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
       }
       ctx.globalAlpha = 1;
     };
@@ -338,7 +503,7 @@ export default function TankCanvas(props: Props) {
             sa.muzzleFlash = 1;
           }
         }
-        proj.idx += 3;
+        proj.idx += 2;
         if (proj.idx >= proj.pts.length) {
           const shot = shotRef.current;
           if (shot && shot.impactX >= 0 && shot.impactX <= W) {
@@ -432,6 +597,8 @@ export default function TankCanvas(props: Props) {
       detectMove('p2', P.p2x);
 
       // ===== DRAW TANKS =====
+      const MAX_BODY_TILT = 0.12; // ~7 degrees max body tilt — prevents stretching on steep slopes
+
       const drawTank = (
         px: number, angle: number, hp: number, slot: PlayerSlot,
         bodyImg: HTMLImageElement | null, turretImg: HTMLImageElement | null,
@@ -443,7 +610,9 @@ export default function TankCanvas(props: Props) {
         const slopeSpan = 20;
         const leftY = getTY(Math.max(0, px - slopeSpan));
         const rightY = getTY(Math.min(W - 1, px + slopeSpan));
-        const slopeAngle = Math.atan2(rightY - leftY, slopeSpan * 2);
+        const rawSlope = Math.atan2(rightY - leftY, slopeSpan * 2);
+        // Clamp body tilt to prevent image stretching/skewing on steep terrain
+        const slopeAngle = Math.max(-MAX_BODY_TILT, Math.min(MAX_BODY_TILT, rawSlope));
         const idleBob = Math.sin(now * 1.5 + (slot === 'player1' ? 0 : Math.PI)) * 1.2;
         const recoilX = anim.recoil * (facingLeft ? 5 : -5);
         const hitTilt = Math.sin(anim.hitRock * 8) * anim.hitRock * .15 * anim.hitDir;
@@ -462,25 +631,44 @@ export default function TankCanvas(props: Props) {
           }
         }
 
-        // Muzzle flash
-        if (anim.muzzleFlash > 0) {
-          const aR = angle * Math.PI / 180;
-          const flashX = px + Math.cos(aR) * 40;
-          const flashY = ty - 18 - Math.sin(aR) * 40;
-          ctx.save();
-          ctx.globalAlpha = anim.muzzleFlash;
-          const flashGrad = ctx.createRadialGradient(flashX, flashY, 0, flashX, flashY, 12);
-          flashGrad.addColorStop(0, '#ffffff');
-          flashGrad.addColorStop(.3, '#ffee44');
-          flashGrad.addColorStop(.6, '#ff8800');
-          flashGrad.addColorStop(1, 'rgba(255,100,0,0)');
-          ctx.fillStyle = flashGrad;
-          ctx.beginPath(); ctx.arc(flashX, flashY, 14, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#fff';
-          ctx.beginPath(); ctx.arc(flashX, flashY, 4, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
+        // Muzzle flash — drawn after tank so we can use barrelTipRef (deferred to post-drawTank)
+
+        // --- Compute barrel tip FIRST (in world coords) so aim guide matches exactly ---
+        let turretLocalX: number, turretLocalY: number, barrelLen: number;
+        if (bodyImg && turretImg) {
+          const scale = 55 / bodyImg.width;
+          const bw = bodyImg.width * scale;
+          const bh = bodyImg.height * scale;
+          turretLocalX = bw * .15;
+          turretLocalY = -bh * .66;
+          barrelLen = turretImg.width * scale;
+        } else {
+          turretLocalX = 0;
+          turretLocalY = -18 + 2; // -tankH + 2
+          barrelLen = 29;
         }
 
+        const flipSign = facingLeft ? -1 : 1;
+        const flippedTurretX = turretLocalX * flipSign;
+        const flippedTurretY = turretLocalY;
+
+        const rot = slopeAngle + hitTilt;
+        const cosR = Math.cos(rot), sinR = Math.sin(rot);
+        const mountWorldX = (px + recoilX) + flippedTurretX * cosR - flippedTurretY * sinR;
+        const mountWorldY = (ty + idleBob) + flippedTurretX * sinR + flippedTurretY * cosR;
+
+        // The barrel direction in world space must account for the body tilt
+        // The turret angle is relative to the body, so add body rotation
+        const bodyRot = slopeAngle + hitTilt;
+        // For player2 (facingLeft), the body is flipped so tilt goes opposite
+        const worldBarrelAngle = angle * Math.PI / 180 + (facingLeft ? -bodyRot : bodyRot);
+        const tipX = mountWorldX + Math.cos(worldBarrelAngle) * barrelLen;
+        const tipY = mountWorldY - Math.sin(worldBarrelAngle) * barrelLen;
+
+        const key = slot === 'player1' ? 'p1' : 'p2';
+        barrelTipRef.current[key] = { x: tipX, y: tipY, angle: worldBarrelAngle };
+
+        // --- Now draw the tank ---
         ctx.save();
         ctx.translate(px + recoilX, ty + idleBob);
         ctx.rotate(slopeAngle + hitTilt);
@@ -503,37 +691,124 @@ export default function TankCanvas(props: Props) {
           ctx.drawImage(turretImg, 0, -brlH / 2, brlW, brlH);
           ctx.restore();
         } else {
-          const tankW = 30, tankH = 15;
+          // HQ procedural tank with detailed rendering
+          const tankW = 36, tankH = 18;
+          const isP1 = slot === 'player1';
+          const mainColor = isP1 ? '#5a7a30' : '#7a3535';
+          const darkColor = isP1 ? '#3a5518' : '#5a2020';
+          const lightColor = isP1 ? '#7a9a48' : '#9a5050';
+          const accentColor = isP1 ? '#88aa55' : '#bb5555';
+
+          // Track / tread base
           ctx.fillStyle = '#1a1a1a';
-          ctx.fillRect(-tankW / 2, -10, tankW, 10);
-          ctx.fillStyle = '#444';
-          for (let i = -2; i <= 2; i++) {
-            ctx.beginPath(); ctx.arc(i * 6, -5, 3, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = '#555'; ctx.lineWidth = .6;
-            const wheelAngle = now * (anim.moving ? 12 : 0) + i;
-            ctx.beginPath();
-            ctx.moveTo(i * 6 + Math.cos(wheelAngle) * 2, -5 + Math.sin(wheelAngle) * 2);
-            ctx.lineTo(i * 6 - Math.cos(wheelAngle) * 2, -5 - Math.sin(wheelAngle) * 2);
-            ctx.stroke();
-          }
-          const c1 = slot === 'player1' ? '#6b7a3a' : '#8b3a3a';
-          const c2 = slot === 'player1' ? '#4a5528' : '#5c2222';
-          ctx.fillStyle = c1;
+          const trackH = 8;
           ctx.beginPath();
-          ctx.moveTo(-tankW / 2 + 4, -4);
-          ctx.lineTo(tankW / 2 - 2, -4);
-          ctx.lineTo(tankW / 2 - 6, -tankH + 6);
-          ctx.lineTo(-tankW / 2 + 8, -tankH + 6);
+          ctx.roundRect(-tankW / 2 - 2, -trackH, tankW + 4, trackH, 3);
+          ctx.fill();
+          // Track highlight
+          ctx.fillStyle = '#282828';
+          ctx.beginPath();
+          ctx.roundRect(-tankW / 2 - 1, -trackH + 1, tankW + 2, 2, 1);
+          ctx.fill();
+
+          // Road wheels with detail
+          ctx.fillStyle = '#3a3a3a';
+          for (let i = -2; i <= 2; i++) {
+            const wx = i * 7;
+            ctx.beginPath(); ctx.arc(wx, -trackH / 2 - 1, 3.5, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#505050';
+            ctx.lineWidth = .5;
+            ctx.beginPath(); ctx.arc(wx, -trackH / 2 - 1, 2.5, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = '#4a4a4a'; ctx.lineWidth = .6;
+            const wheelAngle = now * (anim.moving ? 14 : 0) + i;
+            for (let s = 0; s < 3; s++) {
+              const sa = wheelAngle + s * Math.PI / 1.5;
+              ctx.beginPath();
+              ctx.moveTo(wx + Math.cos(sa) * 1.5, -trackH / 2 - 1 + Math.sin(sa) * 1.5);
+              ctx.lineTo(wx - Math.cos(sa) * 1.5, -trackH / 2 - 1 - Math.sin(sa) * 1.5);
+              ctx.stroke();
+            }
+            ctx.fillStyle = '#555';
+            ctx.beginPath(); ctx.arc(wx, -trackH / 2 - 1, 1, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#3a3a3a';
+          }
+
+          // Hull body with gradient
+          const hullG = ctx.createLinearGradient(0, -trackH - 1, 0, -tankH + 2);
+          hullG.addColorStop(0, darkColor);
+          hullG.addColorStop(.4, mainColor);
+          hullG.addColorStop(1, lightColor);
+          ctx.fillStyle = hullG;
+          ctx.beginPath();
+          ctx.moveTo(-tankW / 2 + 3, -trackH + 1);
+          ctx.lineTo(tankW / 2 - 1, -trackH + 1);
+          ctx.lineTo(tankW / 2 - 4, -tankH + 4);
+          ctx.lineTo(-tankW / 2 + 7, -tankH + 4);
           ctx.closePath(); ctx.fill();
-          ctx.fillStyle = c2;
-          ctx.beginPath(); ctx.arc(0, -tankH + 3, 8, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = accentColor;
+          ctx.lineWidth = .6;
+          ctx.globalAlpha = .4;
+          ctx.beginPath();
+          ctx.moveTo(-tankW / 2 + 7, -tankH + 4);
+          ctx.lineTo(tankW / 2 - 4, -tankH + 4);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+
+          // Turret dome
+          const turretG = ctx.createRadialGradient(0, -tankH + 2, 0, 0, -tankH + 2, 10);
+          turretG.addColorStop(0, lightColor);
+          turretG.addColorStop(.6, mainColor);
+          turretG.addColorStop(1, darkColor);
+          ctx.fillStyle = turretG;
+          ctx.beginPath(); ctx.arc(0, -tankH + 2, 9, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = accentColor;
+          ctx.lineWidth = .5;
+          ctx.globalAlpha = .3;
+          ctx.beginPath(); ctx.arc(0, -tankH + 2, 9, 0, Math.PI * 2); ctx.stroke();
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = darkColor;
+          ctx.beginPath(); ctx.arc(-2, -tankH, 3, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = mainColor;
+          ctx.beginPath(); ctx.arc(-2, -tankH, 2, 0, Math.PI * 2); ctx.fill();
+
+          // Barrel with detail
           ctx.save();
-          ctx.translate(0, -tankH + 3);
+          ctx.translate(0, -tankH + 2);
           const fallbackEffAngle = facingLeft ? (180 - angle) : angle;
           ctx.rotate(-(fallbackEffAngle * Math.PI / 180));
-          ctx.fillStyle = '#666'; ctx.fillRect(0, -1.8, 24, 3.5);
-          ctx.fillStyle = '#555'; ctx.fillRect(22, -2.5, 4, 5);
+          ctx.fillStyle = '#333';
+          ctx.beginPath();
+          ctx.roundRect(2, -1.2, 26, 3.8, 1);
+          ctx.fill();
+          const barrelG = ctx.createLinearGradient(0, -2, 0, 2.5);
+          barrelG.addColorStop(0, '#777');
+          barrelG.addColorStop(.3, '#5a5a5a');
+          barrelG.addColorStop(1, '#444');
+          ctx.fillStyle = barrelG;
+          ctx.beginPath();
+          ctx.roundRect(1, -1.5, 25, 3.5, 1);
+          ctx.fill();
+          ctx.fillStyle = '#666';
+          ctx.beginPath();
+          ctx.roundRect(24, -2.5, 5, 5.5, 1);
+          ctx.fill();
+          ctx.fillStyle = '#555';
+          ctx.fillRect(25.5, -2, 1, 4.5);
+          ctx.globalAlpha = .3;
+          ctx.strokeStyle = '#999';
+          ctx.lineWidth = .5;
+          ctx.beginPath();
+          ctx.moveTo(2, -1.5);
+          ctx.lineTo(24, -1.5);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
           ctx.restore();
+
+          // Exhaust pipes on back
+          ctx.fillStyle = '#333';
+          ctx.fillRect(-tankW / 2 + 4, -tankH + 3, 2, 5);
+          ctx.fillStyle = '#444';
+          ctx.fillRect(-tankW / 2 + 4, -tankH + 2, 2, 2);
         }
 
         if (hp < 30) {
@@ -544,6 +819,7 @@ export default function TankCanvas(props: Props) {
         }
 
         ctx.restore();
+
         anim.recoil *= .85; anim.hitRock *= .92;
         anim.muzzleFlash *= .88; anim.moveSmoke *= .95;
       };
@@ -553,37 +829,37 @@ export default function TankCanvas(props: Props) {
       drawTank(P.p1x, P.p1Angle, P.p1Hp, 'player1', tBody, tTurret);
       drawTank(P.p2x, P.p2Angle, P.p2Hp, 'player2', tBody, tTurret);
 
+      // ===== MUZZLE FLASH (uses barrel tip positions computed by drawTank) =====
+      for (const slotKey of ['p1', 'p2'] as const) {
+        const anim = ta[slotKey];
+        if (anim.muzzleFlash > 0) {
+          const tip = barrelTipRef.current[slotKey];
+          ctx.save();
+          ctx.globalAlpha = anim.muzzleFlash;
+          const flashGrad = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, 12);
+          flashGrad.addColorStop(0, '#ffffff');
+          flashGrad.addColorStop(.3, '#ffee44');
+          flashGrad.addColorStop(.6, '#ff8800');
+          flashGrad.addColorStop(1, 'rgba(255,100,0,0)');
+          ctx.fillStyle = flashGrad;
+          ctx.beginPath(); ctx.arc(tip.x, tip.y, 14, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.beginPath(); ctx.arc(tip.x, tip.y, 4, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }
+      }
+
       // ===== AIM GUIDE =====
       if (!animRef.current && P.currentTurn === P.mySlot) {
-        const tx = P.mySlot === 'player1' ? P.p1x : P.p2x;
-        const ang = P.mySlot === 'player1' ? P.p1Angle : P.p2Angle;
         const pow = P.mySlot === 'player1' ? P.p1Power : P.p2Power;
-        const ty = getTY(tx);
-        const aR = ang * Math.PI / 180, spd = pow * .14;
-        const facingLeft = P.mySlot === 'player2';
-        const flipSign = facingLeft ? -1 : 1;
+        const spd = pow * .14;
 
-        // Compute terrain slope (same as drawTank)
-        const slopeSpan = 20;
-        const sLeftY = getTY(Math.max(0, tx - slopeSpan));
-        const sRightY = getTY(Math.min(W - 1, tx + slopeSpan));
-        const slope = Math.atan2(sRightY - sLeftY, slopeSpan * 2);
-
-        // Barrel mount point in tank-local coords (before flip)
-        // From drawTank PNG path: translate(bw*.15, -bh*.62) with 55px body
-        const mountLocalX = 8; // bw * .15 ≈ 8
-        const mountLocalY = -24; // -bh * .66 ≈ -24
-
-        // Apply flip then slope rotation to get mount point in world coords
-        const mx = mountLocalX * flipSign;
-        const my = mountLocalY;
-        const mountWorldX = tx + mx * Math.cos(slope) - my * Math.sin(slope);
-        const mountWorldY = ty + mx * Math.sin(slope) + my * Math.cos(slope);
-
-        // Barrel tip: barrel extends along the fire angle from mount point
-        const brlLen = 24;
-        let sx = mountWorldX + Math.cos(aR) * brlLen;
-        let sy = mountWorldY - Math.sin(aR) * brlLen;
+        // Use the barrel tip + world angle computed by drawTank — exact match guaranteed
+        const tipKey = P.mySlot === 'player1' ? 'p1' : 'p2';
+        const tip = barrelTipRef.current[tipKey];
+        const aR = tip.angle; // world-space barrel angle (includes body tilt)
+        let sx = tip.x;
+        let sy = tip.y;
         let svx = Math.cos(aR) * spd, svy = -Math.sin(aR) * spd;
 
         const t = now; // animation time
@@ -712,7 +988,10 @@ export default function TankCanvas(props: Props) {
   return (
     <canvas
       ref={canvasRef}
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+      style={{
+        position: 'absolute', inset: 0, width: '100%', height: '100%',
+        imageRendering: 'auto',
+      }}
     />
   );
 }

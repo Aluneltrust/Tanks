@@ -8,7 +8,7 @@ import { STAKE_TIERS, STORAGE_KEYS, BSV_NETWORK } from './constants';
 import { useMultiplayer } from './hooks/useMultiplayer';
 import { bsvWalletService, bsvPriceService, fetchBalance, isEmbedded, bridgeGetAddress, bridgeGetBalance, bridgeGetUsername, bridgeSignTransaction } from './services';
 import { hasStoredWallet, getAddressHint, encryptAndStoreWif, decryptStoredWif, deleteStoredWallet } from './services/pinCrypto';
-import TankCanvas from './components/three/TankScene';
+import TankCanvas from './components/TankCanvas';
 import TerrainDrawer from './components/TerrainDrawer';
 import WalletPage from './components/WalletPage';
 import { audioManager } from './components/AudioManager';
@@ -33,6 +33,10 @@ export default function App() {
 
   // Wallet page state
   const [showWallet, setShowWallet] = useState(false);
+
+  // Audio state
+  const [isMuted, setIsMuted] = useState(() => audioManager.isMuted());
+  const [musicVolume, setMusicVolume] = useState(() => audioManager.getMusicVolume());
 
   // Game state
   const [selectedTier, setSelectedTier] = useState(1);
@@ -296,6 +300,36 @@ export default function App() {
   }, [walletAddress, embeddedMode]);
 
   // ============================================================================
+  // SOUND CONTROLS — rendered on every screen
+  // ============================================================================
+
+  const toggleMute = useCallback(() => {
+    const nowMuted = audioManager.toggleMute();
+    setIsMuted(nowMuted);
+  }, []);
+
+  const soundControls = (
+    <div className={`sound-controls ${isMuted ? 'muted' : ''}`}>
+      <button className={`sound-mute-btn ${isMuted ? 'muted' : ''}`} onClick={toggleMute}>
+        {isMuted ? '\u{1F507}' : '\u{1F50A}'}
+      </button>
+      <input
+        type="range"
+        className="sound-volume-slider"
+        min="0"
+        max="0.4"
+        step="0.01"
+        value={musicVolume}
+        onChange={(e) => {
+          const vol = parseFloat(e.target.value);
+          setMusicVolume(vol);
+          audioManager.setMusicVolume(vol);
+        }}
+      />
+    </div>
+  );
+
+  // ============================================================================
   // RENDER — WALLET OVERLAY (before everything else so it covers all screens)
   // ============================================================================
 
@@ -365,6 +399,7 @@ export default function App() {
             </button>
           </div>
         )}
+        {soundControls}
       </div>
     );
   }
@@ -381,6 +416,7 @@ export default function App() {
         <div className="spinner" />
         <div className="message-bar">{mp.message}</div>
         <button className="btn btn-secondary" onClick={mp.cancelMatchmaking}>Cancel</button>
+        {soundControls}
       </div>
     );
   }
@@ -440,6 +476,7 @@ export default function App() {
             </div>
           </div>
         )}
+        {soundControls}
       </div>
     );
   }
@@ -461,6 +498,7 @@ export default function App() {
             {mp.message}
           </div>
         )}
+        {soundControls}
       </div>
     );
   }
@@ -480,7 +518,6 @@ export default function App() {
 
     return (
       <div className="game-screen">
-        <button className="wallet-topbar-btn wallet-btn-floating" onClick={() => setShowWallet(true)}>Wallet</button>
         {/* Canvas — fills entire screen */}
         <TankCanvas
           terrain={mp.terrain}
@@ -571,6 +608,31 @@ export default function App() {
                   <button onClick={() => { if (confirm('Surrender?')) mp.resign(); }}>Resign</button>
                 </>
               )}
+            </div>
+
+            <div className="control-divider" />
+
+            <button className="controls-wallet-btn" onClick={() => setShowWallet(true)}>Wallet</button>
+
+            <div className="control-divider" />
+
+            <div className="controls-sound">
+              <button className={`controls-mute-btn ${isMuted ? 'muted' : ''}`} onClick={toggleMute}>
+                {isMuted ? '\u{1F507}' : '\u{1F50A}'}
+              </button>
+              <input
+                type="range"
+                className="controls-volume-slider"
+                min="0"
+                max="0.4"
+                step="0.01"
+                value={musicVolume}
+                onChange={(e) => {
+                  const vol = parseFloat(e.target.value);
+                  setMusicVolume(vol);
+                  audioManager.setMusicVolume(vol);
+                }}
+              />
             </div>
           </div>
         </div>
@@ -686,6 +748,7 @@ export default function App() {
           ))}
         </div>
       )}
+      {soundControls}
     </div>
   );
 }
