@@ -28,6 +28,12 @@ if (CORS_ORIGINS.length > 0) {
 }
 
 app.use(express.json({ limit: '1mb' }));
+
+// Basic health check — must respond even if DB is down
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
+});
+
 app.use(apiRouter);
 
 // Serve client static files from client/dist
@@ -51,8 +57,8 @@ const io = new Server(server, {
 async function start() {
   const escrowOk = escrowManager.init();
 
-  try { await initDatabase(); }
-  catch (err) { console.error('❌ DB init failed:', err); }
+  try { await initDatabase(); console.log('  DB:       ✅ Connected'); }
+  catch (err) { console.warn('⚠️ DB init failed (server will run without stats):', (err as Error).message); }
 
   const bsvPrice = await priceService.getPrice();
   setupSocketHandlers(io);

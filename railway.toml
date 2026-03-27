@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npm run build"
+buildCommand = "npm install --include=dev && npm run build"
 watchPatterns = ["src/**", "client/**", "package.json", "tsconfig.json"]
 
 [deploy]
