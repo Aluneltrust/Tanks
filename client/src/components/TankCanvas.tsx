@@ -634,6 +634,14 @@ export default function TankCanvas(props: Props) {
         // Muzzle flash — drawn after tank so we can use barrelTipRef (deferred to post-drawTank)
 
         // --- Compute barrel tip FIRST (in world coords) so aim guide matches exactly ---
+        // Replicate the exact canvas transform chain:
+        //   1. translate(px + recoilX, ty + idleBob)
+        //   2. rotate(slopeAngle + hitTilt)
+        //   3. scale(-1, 1) if facingLeft
+        //   4. translate(turretLocalX, turretLocalY)  — turret mount
+        //   5. rotate(-effectiveAngle)                — barrel elevation
+        //   6. point at (barrelLen, 0)                — barrel tip in local coords
+
         let turretLocalX: number, turretLocalY: number, barrelLen: number;
         if (bodyImg && turretImg) {
           const scale = 55 / bodyImg.width;
@@ -648,22 +656,38 @@ export default function TankCanvas(props: Props) {
           barrelLen = 29;
         }
 
-        const flipSign = facingLeft ? -1 : 1;
-        const flippedTurretX = turretLocalX * flipSign;
-        const flippedTurretY = turretLocalY;
+        // Step 5+6: barrel tip relative to turret mount (in body-local coords after flip)
+        const effectiveAngle = facingLeft ? (180 - angle) : angle;
+        const elevRad = -(effectiveAngle * Math.PI / 180);
+        // Barrel tip in turret-local: rotate (barrelLen, 0) by elevRad
+        const bTipLocalX = turretLocalX + Math.cos(elevRad) * barrelLen;
+        const bTipLocalY = turretLocalY + Math.sin(elevRad) * barrelLen;
 
+        // Step 3: apply flip
+        const flippedX = facingLeft ? -bTipLocalX : bTipLocalX;
+        const flippedY = bTipLocalY;
+
+        // Step 2: apply body rotation (slopeAngle + hitTilt)
         const rot = slopeAngle + hitTilt;
         const cosR = Math.cos(rot), sinR = Math.sin(rot);
-        const mountWorldX = (px + recoilX) + flippedTurretX * cosR - flippedTurretY * sinR;
-        const mountWorldY = (ty + idleBob) + flippedTurretX * sinR + flippedTurretY * cosR;
+        const rotatedX = flippedX * cosR - flippedY * sinR;
+        const rotatedY = flippedX * sinR + flippedY * cosR;
 
-        // The barrel direction in world space must account for the body tilt
-        // The turret angle is relative to the body, so add body rotation
-        const bodyRot = slopeAngle + hitTilt;
-        // For player2 (facingLeft), the body is flipped so tilt goes opposite
-        const worldBarrelAngle = angle * Math.PI / 180 + (facingLeft ? -bodyRot : bodyRot);
-        const tipX = mountWorldX + Math.cos(worldBarrelAngle) * barrelLen;
-        const tipY = mountWorldY - Math.sin(worldBarrelAngle) * barrelLen;
+        // Step 1: translate to world position
+        const tipX = (px + recoilX) + rotatedX;
+        const tipY = (ty + idleBob) + rotatedY;
+
+        // World-space barrel direction: same chain but for the direction vector (barrelLen, 0)
+        // Direction in turret-local after elevation
+        const dirLocalX = Math.cos(elevRad);
+        const dirLocalY = Math.sin(elevRad);
+        // After flip
+        const dirFlipX = facingLeft ? -dirLocalX : dirLocalX;
+        const dirFlipY = dirLocalY;
+        // After body rotation
+        const dirWorldX = dirFlipX * cosR - dirFlipY * sinR;
+        const dirWorldY = dirFlipX * sinR + dirFlipY * cosR;
+        const worldBarrelAngle = Math.atan2(-dirWorldY, dirWorldX);
 
         const key = slot === 'player1' ? 'p1' : 'p2';
         barrelTipRef.current[key] = { x: tipX, y: tipY, angle: worldBarrelAngle };
