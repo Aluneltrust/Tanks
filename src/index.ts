@@ -9,6 +9,7 @@ import express from 'express';
 import cors from 'cors';
 import http from 'http';
 import path from 'path';
+import fs from 'fs';
 import { Server } from 'socket.io';
 import { initDatabase } from './DB/Database';
 import { escrowManager, priceService } from './wallet/BsvService';
@@ -37,13 +38,34 @@ app.get('/health', (_req, res) => {
 app.use(apiRouter);
 
 // Serve client static files from client/dist
-const clientDist = path.join(__dirname, '..', 'client', 'dist');
-app.use(express.static(clientDist));
+const clientDist = path.resolve(__dirname, '..', 'client', 'dist');
+const indexHtml = path.join(clientDist, 'index.html');
 
-// SPA fallback — serve index.html for any non-API, non-file route
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(clientDist, 'index.html'));
-});
+console.log(`📂 Client dist path: ${clientDist}`);
+console.log(`📂 index.html exists: ${fs.existsSync(indexHtml)}`);
+if (fs.existsSync(clientDist)) {
+  console.log(`📂 Client dist contents: ${fs.readdirSync(clientDist).join(', ')}`);
+}
+
+if (fs.existsSync(indexHtml)) {
+  app.use(express.static(clientDist));
+  // SPA fallback — serve index.html for any non-API, non-file route
+  app.get('*', (_req, res) => {
+    res.sendFile(indexHtml);
+  });
+} else {
+  console.warn('⚠️ Client dist not found — frontend will not be served');
+  app.get('/', (_req, res) => {
+    res.json({
+      status: 'Server running, client not built',
+      clientDist,
+      __dirname,
+      cwd: process.cwd(),
+      dirContents: fs.existsSync(path.resolve(__dirname, '..'))
+        ? fs.readdirSync(path.resolve(__dirname, '..')) : 'parent not found',
+    });
+  });
+}
 
 const server = http.createServer(app);
 const io = new Server(server, {
