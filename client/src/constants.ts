@@ -2,7 +2,11 @@
 // FRONTEND CONSTANTS — BSV Tank Wars
 // ============================================================================
 
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3002';
+// In production (Railway), frontend is served by the same server — use same origin.
+// In dev, point to the local server on port 3002.
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (
+  import.meta.env.DEV ? 'http://localhost:3002' : ''
+);
 export const BSV_NETWORK = import.meta.env.VITE_BSV_NETWORK || 'main';
 
 export interface StakeTierDef {

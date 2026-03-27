@@ -8,6 +8,7 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import http from 'http';
+import path from 'path';
 import { Server } from 'socket.io';
 import { initDatabase } from './DB/Database';
 import { escrowManager, priceService } from './wallet/BsvService';
@@ -15,16 +16,34 @@ import apiRouter from './API/Api';
 import { setupSocketHandlers } from './socket/SocketHandler';
 
 const PORT = parseInt(process.env.PORT || '3002');
-const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(s => s.trim());
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 
 const app = express();
-app.use(cors({ origin: CORS_ORIGINS, credentials: true }));
+
+// CORS — only needed for external origins (dev mode, embedded iframe)
+if (CORS_ORIGINS.length > 0) {
+  app.use(cors({ origin: CORS_ORIGINS, credentials: true }));
+} else {
+  app.use(cors());
+}
+
 app.use(express.json({ limit: '1mb' }));
 app.use(apiRouter);
 
+// Serve client static files from client/dist
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+app.use(express.static(clientDist));
+
+// SPA fallback — serve index.html for any non-API, non-file route
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(clientDist, 'index.html'));
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: CORS_ORIGINS, methods: ['GET', 'POST'], credentials: true },
+  cors: CORS_ORIGINS.length > 0
+    ? { origin: CORS_ORIGINS, methods: ['GET', 'POST'], credentials: true }
+    : { origin: '*' },
   pingInterval: 25_000,
   pingTimeout: 60_000,
 });
