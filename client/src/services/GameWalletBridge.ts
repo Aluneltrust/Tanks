@@ -7,11 +7,15 @@
 
 let requestId = 0;
 
-// Allowed parent origins — add deployed AlunelGames URL when ready
+// Allowed parent origins — AlunelGames in dev + production
 const ALLOWED_PARENT_ORIGINS = new Set([
+  'http://localhost:5173',
   'http://localhost:5180',
   'https://alunelgames.com',
   'https://www.alunelgames.com',
+  'https://alunelgames.netlify.app',
+  'https://alunel.games',
+  'https://www.alunel.games',
 ]);
 
 function getParentOrigin(): string {

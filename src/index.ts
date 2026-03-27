@@ -30,6 +30,13 @@ if (CORS_ORIGINS.length > 0) {
 
 app.use(express.json({ limit: '1mb' }));
 
+// Allow iframe embedding from AlunelGames
+app.use((_req, res, next) => {
+  res.setHeader('X-Frame-Options', 'ALLOWALL');
+  res.removeHeader('X-Frame-Options');
+  next();
+});
+
 // Basic health check — must respond even if DB is down
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
